@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#0b5fa5"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Thủy Nguyên Map"><meta name="format-detection" content="telephone=yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Bản đồ số Thủy Nguyên</title>
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png"><link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login" class="screen">
+  <div class="login-card">
+    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6.3 Premium</p>
+    <input id="user" placeholder="Email / tài khoản" value="admin" autocomplete="username">
+    <input id="pass" placeholder="Mật khẩu" type="password" value="admin123" autocomplete="current-password">
+    <button onclick="login()">Đăng nhập</button>
+    <small id="loginHint">Demo cục bộ: admin / admin123 &nbsp; | &nbsp; user / user123</small>
+  </div>
+</div>
+<div id="app" class="hidden">
+  <header>
+    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6.3</span></div>
+    <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="cloud-btn" onclick="openCloudSetup()">☁ Cloud</button><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
+  </header>
+  <div class="toolbar">
+    <input id="search" placeholder="🔎 Tìm cơ sở, TDP, chủ cơ sở, cán bộ..." oninput="renderAll()">
+    <select id="statusFilter" onchange="renderAll()"><option value="">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Không hoạt động</option></select>
+    <button class="primary admin-only" onclick="openEditor()">＋ Thêm</button>
+    <button onclick="locateMe()" title="Vị trí của tôi">◎</button>
+    <button onclick="fitAll()" title="Hiện toàn bộ điểm">⌖</button>
+    <button class="admin-only" onclick="openDataMenu()" title="Nhập / xuất dữ liệu">⇅</button>
+  </div>
+  <main>
+    <aside id="sidebar"><div id="stats" class="stats"></div><div id="list"></div></aside>
+    <section id="map"></section>
+    <div id="detail" class="detail hidden"></div>
+  </main>
+  <nav class="mobile-nav">
+    <button onclick="showMobileTab('map')">🗺️<span>Bản đồ</span></button>
+    <button onclick="showMobileTab('list')">📋<span>Danh sách</span></button>
+    <button onclick="locateMe()">◎<span>Vị trí</span></button>
+    <button class="admin-only" onclick="openEditor()">＋<span>Thêm</span></button><button onclick="openInstallHelp()">•••<span>Thêm</span></button>
+  </nav>
+</div>
+<div id="modal" class="modal hidden" onclick="modalBackdrop(event)"><div id="modalCard" class="modal-card"></div></div>
+<div id="toast"></div><input id="importFile" type="file" accept="application/json,.json" hidden onchange="importJson(event)">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="data.js"></script><script src="app.js"></script>
+</body></html>

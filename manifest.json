@@ -1,0 +1,60 @@
+{
+  "name": "Bản đồ số Thủy Nguyên Mobile V6.4",
+  "short_name": "Thủy Nguyên",
+  "description": "Ứng dụng bản đồ số Thủy Nguyên: Cloud, vị trí cơ sở, tra cứu và chỉ đường.",
+  "id": "thuy-nguyen-map-v6-4",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0b5fa5",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "display_override": [
+    "standalone",
+    "fullscreen",
+    "minimal-ui"
+  ],
+  "categories": [
+    "navigation",
+    "utilities",
+    "productivity"
+  ],
+  "shortcuts": [
+    {
+      "name": "Mở bản đồ",
+      "short_name": "Bản đồ",
+      "url": "./index.html?tab=map",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Danh sách cơ sở",
+      "short_name": "Danh sách",
+      "url": "./index.html?tab=list",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
