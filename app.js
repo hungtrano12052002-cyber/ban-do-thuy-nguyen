@@ -1,6 +1,6 @@
-let places=[], map, markers=[], markerLayer=null, baseLayers={}, currentBaseLayer=null, currentUser=null, selectedId=null, supabaseClient=null, realtimeChannel=null;
+let places=[], map, markers=[], currentUser=null, selectedId=null, supabaseClient=null, realtimeChannel=null, baseLayers={}, currentBase='street';
 const defaultCenter=[20.96,106.69];
-const STORE='thuynguyen_places_v5';
+const STORE='thuynguyen_places_v6';
 const demoAuth={admin:{pass:'admin123',role:'admin'},user:{pass:'user123',role:'user'}};
 const cfg=window.APP_CONFIG||{};
 const cloudEnabled=!!(cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&window.supabase?.createClient);
@@ -11,17 +11,10 @@ function initCloud(){
 }
 async function init(){
   map=L.map('map',{zoomControl:false,preferCanvas:true}).setView(defaultCenter,12);
-  baseLayers={
-    'Đường phố':L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}),
-    'Vệ tinh':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'}),
-    'Sáng':L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:20,attribution:'© OpenStreetMap © CARTO'})
-  };
-  currentBaseLayer=baseLayers['Đường phố']; currentBaseLayer.addTo(map);
-  L.control.layers(baseLayers,null,{position:'topright',collapsed:true}).addTo(map);
-  L.control.zoom({position:'bottomright'}).addTo(map);
-  L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
-  markerLayer=window.L.markerClusterGroup?L.markerClusterGroup({showCoverageOnHover:false,spiderfyOnMaxZoom:true,maxClusterRadius:42,disableClusteringAtZoom:17}):L.layerGroup();
-  markerLayer.addTo(map);
+  baseLayers.street=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
+  baseLayers.satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'});
+  baseLayers.street.addTo(map); L.control.zoom({position:'bottomright'}).addTo(map);
+  map.on('zoomend',()=>renderMarkers());
   if(cloudEnabled&&currentUser?.cloud){await loadCloudPlaces();subscribeRealtime();}
   else loadLocalPlaces();
   renderAll();
@@ -85,19 +78,14 @@ function isActive(s=''){return !/không hoạt động|ngừng|thu hồi|đóng 
 function renderAll(){renderStats();renderList();renderMarkers()}
 function renderStats(){const visible=filtered(),active=visible.filter(x=>isActive(x.status)).length,geo=visible.filter(validGeo).length;$('stats').innerHTML=`<div><b>${visible.length}</b><span>Cơ sở</span></div><div><b>${active}</b><span>Hoạt động</span></div><div><b>${geo}</b><span>Có tọa độ</span></div>`}
 function renderList(){const arr=filtered(),list=$('list');list.innerHTML=arr.length?arr.map(x=>`<div class="item ${selectedId===x.id?'selected':''}" onclick="focusPlace('${escJs(x.id)}')"><div class="item-head"><b>${esc(x.name)}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.wardBlock||'Chưa có TDP')} · ${esc(x.officer||'Chưa phân công')}</small><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>`).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`}
-function markerIcon(active,selected=false){return L.divIcon({className:'pin-wrap'+(selected?' selected-pin':''),html:`<div class="house-pin ${active?'on':'off'}"><span>⌂</span></div>`,iconSize:selected?[42,50]:[34,42],iconAnchor:selected?[21,48]:[17,40],popupAnchor:[0,-38]})}
-function renderMarkers(){if(!map||!markerLayer)return;markerLayer.clearLayers();markers=[];filtered().forEach(x=>{if(validGeo(x)){const m=L.marker([x.lat,x.lng],{icon:markerIcon(isActive(x.status),String(selectedId)===String(x.id)),title:x.name});m.placeId=String(x.id);m.bindTooltip(`<b>${esc(x.name)}</b><br><span>${esc(x.wardBlock||'')}</span>`,{direction:'top',offset:[0,-34],className:'place-tooltip',permanent:false});m.bindPopup(`<div class="map-popup"><b>${esc(x.name)}</b><span>${esc(x.wardBlock||'Chưa có khu vực')}</span><em>${esc(x.status||'Chưa rõ')}</em><button onclick="focusPlace('${escJs(x.id)}')">Xem chi tiết</button><a href="${escAttr(directionUrl(x))}" target="_blank" rel="noopener">🧭 Chỉ đường</a></div>`,{maxWidth:260,closeButton:true});m.on('click',()=>{selectedId=x.id;renderList();renderMarkers();showDetail(x)});markers.push(m);markerLayer.addLayer(m)}});updateMarkerLabels()}
-function updateMarkerLabels(){if(!map)return;const show=map.getZoom()>=15;markers.forEach(m=>{if(show)m.openTooltip();else m.closeTooltip()})}
-
-function setBaseMap(mode){
- if(!map)return; const next=mode==='satellite'?baseLayers['Vệ tinh']:baseLayers['Đường phố'];
- if(currentBaseLayer&&map.hasLayer(currentBaseLayer))map.removeLayer(currentBaseLayer);
- currentBaseLayer=next; currentBaseLayer.addTo(map); toast(mode==='satellite'?'Đã chuyển sang ảnh vệ tinh.':'Đã chuyển sang bản đồ đường phố.');
-}
-
+function markerIcon(active,name){const show=map&&map.getZoom()>=15;return L.divIcon({className:'pin-wrap',html:`<div class="v6-marker"><span class="map-pin ${active?'on':'off'}"><i>⌂</i></span>${show?`<b>${esc(name)}</b>`:''}</div>`,iconSize:[show?190:34,42],iconAnchor:[17,34]})}
+function renderMarkers(){if(!map)return;markers.forEach(m=>map.removeLayer(m));markers=[];filtered().forEach(x=>{if(validGeo(x)){const m=L.marker([x.lat,x.lng],{icon:markerIcon(isActive(x.status),x.name),riseOnHover:true}).addTo(map);m.bindTooltip(`<b>${esc(x.name)}</b><br><small>${esc(x.wardBlock||'')}</small>`,{direction:'top',offset:[0,-28]});m.on('click',()=>showDetail(x));markers.push(m)}});updateMapNotice()}
+function updateMapNotice(){const e=$('mapNotice');if(!e)return;const total=filtered().length,geo=filtered().filter(validGeo).length;e.innerHTML=geo?`<b>${geo}</b> điểm đang hiển thị trên bản đồ${geo<total?` · <b>${total-geo}</b> điểm chưa có tọa độ`:''}`:`<b>Chưa có điểm nào có tọa độ.</b> Dữ liệu hiện có ${total} cơ sở nhưng link Google Maps rút gọn chưa cung cấp lat/lng.`;e.classList.toggle('warn',geo<total)}
+function toggleBaseMap(){if(!map)return;map.removeLayer(baseLayers[currentBase]);currentBase=currentBase==='street'?'satellite':'street';baseLayers[currentBase].addTo(map);const b=$('layerBtn');if(b)b.textContent=currentBase==='street'?'🛰️':'🗺️';toast(currentBase==='street'?'Bản đồ đường phố':'Ảnh vệ tinh')}
+function showUnlocated(){const arr=filtered().filter(x=>!validGeo(x));if(!arr.length)return toast('Tất cả điểm đã có tọa độ.');showMobileTab('list');toast(`${arr.length} cơ sở chưa có tọa độ. Mở từng cơ sở > Sửa để đặt vị trí.`)}
 function validGeo(x){return Number.isFinite(Number(x.lat))&&Number.isFinite(Number(x.lng))&&Number(x.lat)!==0&&Number(x.lng)!==0}
-function fitAll(){const pts=filtered().filter(validGeo).map(x=>[x.lat,x.lng]);if(pts.length)map.fitBounds(pts,{padding:[50,50],maxZoom:16});else toast('Chưa có cơ sở nào có tọa độ.')}
-function focusPlace(id){const x=places.find(p=>String(p.id)===String(id));if(!x)return;selectedId=x.id;renderList();renderMarkers();if(validGeo(x))map.flyTo([x.lat,x.lng],18,{duration:.65});showDetail(x)}
+function fitAll(){const pts=filtered().filter(validGeo).map(x=>[x.lat,x.lng]);if(pts.length)map.fitBounds(pts,{padding:[40,40],maxZoom:16});else toast('Chưa có cơ sở nào có tọa độ.')}
+function focusPlace(id){const x=places.find(p=>String(p.id)===String(id));if(!x)return;selectedId=x.id;renderList();if(validGeo(x))map.setView([x.lat,x.lng],16);showDetail(x)}
 function showDetail(x){
  selectedId=x.id;renderList();const d=$('detail');d.classList.remove('hidden');const imgs=(x.images||[]).slice(0,8).map(src=>`<img src="${escAttr(src)}" alt="Ảnh cơ sở" loading="lazy">`).join('');
  d.innerHTML=`<button class="close" onclick="dclose()">×</button><div class="detail-title"><h2>${esc(x.name)}</h2><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>${imgs?`<div class="gallery">${imgs}</div>`:''}${row('TDP / khu vực',x.wardBlock)}${row('Chủ cơ sở',x.ownerName)}${row('Số điện thoại',phoneLink(x.ownerPhone))}${row('Người quản lý',x.managerName)}${row('SĐT quản lý',phoneLink(x.managerPhone))}${row('Địa chỉ quản lý',x.managerAddress)}${row('Cán bộ phụ trách',x.officer)}${row('Quy mô',x.scale)}${row('Pháp lý',x.legal)}${row('Tọa độ',validGeo(x)?`${x.lat}, ${x.lng}`:'Chưa có')}<div class="actions mobile-actions"><a class="route-a" href="${escAttr(directionUrl(x))}" target="_blank" rel="noopener">🧭 Chỉ đường</a>${x.mapsUrl?`<a href="${escAttr(x.mapsUrl)}" target="_blank" rel="noopener">📍 Google Maps</a>`:''}<a class="secondary-a" href="${escAttr(googleImageUrl(x))}" target="_blank" rel="noopener">🖼️ Ảnh Google</a>${validGeo(x)?`<a class="secondary-a" href="${escAttr(streetViewUrl(x))}" target="_blank" rel="noopener">👁 Street View</a>`:''}<button class="secondary" onclick="sharePlace('${escJs(x.id)}')">↗️ Chia sẻ</button>${x.lodgerListUrl?`<a class="secondary-a" href="${escAttr(x.lodgerListUrl)}" target="_blank" rel="noopener">📋 Danh sách</a>`:''}<button class="secondary admin-only" onclick="openEditor('${escJs(x.id)}')">✏️ Sửa</button></div>`;
@@ -105,7 +93,7 @@ function showDetail(x){
 function row(a,b){return `<div class="row"><label>${esc(a)}</label><div>${b&&String(b).startsWith('<a ')?b:esc(b||'—')}</div></div>`}
 function phoneLink(v){if(!v)return '—';const p=String(v).replace(/\D/g,'');return `<a class="phone" href="tel:${p}">${esc(formatPhone(v))}</a>`}
 function formatPhone(v){let s=String(v).trim();if(/^\d{9}$/.test(s))s='0'+s;return s}
-function dclose(){selectedId=null;$('detail').classList.add('hidden');renderList();renderMarkers()}
+function dclose(){selectedId=null;$('detail').classList.add('hidden');renderList()}
 
 function openEditor(id=null){
  if(currentUser.role!=='admin')return toast('Chỉ ADMIN được chỉnh sửa dữ liệu.');
@@ -177,7 +165,7 @@ function showMobileTab(tab){document.body.dataset.mobiletab=tab;setTimeout(()=>m
 function isIos(){return /iphone|ipad|ipod/i.test(navigator.userAgent)}
 function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true}
 function installPwa(){if(isStandalone())return toast('Ứng dụng đã được cài trên màn hình chính.');if(window.__deferredPrompt){window.__deferredPrompt.prompt();window.__deferredPrompt.userChoice.finally(()=>window.__deferredPrompt=null);return}openInstallHelp()}
-function openInstallHelp(){const ios=isIos();$('modalCard').innerHTML=`<div class="modal-head"><h2>📱 Cài ứng dụng trên điện thoại</h2><button onclick="closeModal()">×</button></div><div class="install-help"><div class="install-logo"><img src="icons/icon-192.png"><div><b>Bản đồ số Thủy Nguyên</b><span>Mobile V6.5 · Cloud Sync</span></div></div>${ios?`<ol><li>Mở địa chỉ ứng dụng bằng <b>Safari</b>.</li><li>Nhấn nút <b>Chia sẻ</b>.</li><li>Chọn <b>Thêm vào Màn hình chính</b>.</li><li>Nhấn <b>Thêm</b>.</li></ol>`:`<ol><li>Mở ứng dụng bằng Chrome/Edge.</li><li>Nhấn <b>Cài đặt ứng dụng</b> hoặc <b>Add to Home screen</b>.</li><li>Xác nhận cài đặt.</li></ol>`}<div class="install-note"><b>V6.5:</b> Khi cấu hình Supabase, mọi thiết bị đăng nhập sẽ dùng chung dữ liệu và ảnh.</div><button class="primary install-full" onclick="closeModal()">Đã hiểu</button></div>`;$('modal').classList.remove('hidden')}
+function openInstallHelp(){const ios=isIos();$('modalCard').innerHTML=`<div class="modal-head"><h2>📱 Cài ứng dụng trên điện thoại</h2><button onclick="closeModal()">×</button></div><div class="install-help"><div class="install-logo"><img src="icons/icon-192.png"><div><b>Bản đồ số Thủy Nguyên</b><span>Mobile V6 · Map Upgrade</span></div></div>${ios?`<ol><li>Mở địa chỉ ứng dụng bằng <b>Safari</b>.</li><li>Nhấn nút <b>Chia sẻ</b>.</li><li>Chọn <b>Thêm vào Màn hình chính</b>.</li><li>Nhấn <b>Thêm</b>.</li></ol>`:`<ol><li>Mở ứng dụng bằng Chrome/Edge.</li><li>Nhấn <b>Cài đặt ứng dụng</b> hoặc <b>Add to Home screen</b>.</li><li>Xác nhận cài đặt.</li></ol>`}<div class="install-note"><b>V6:</b> Khi cấu hình Supabase, mọi thiết bị đăng nhập sẽ dùng chung dữ liệu và ảnh.</div><button class="primary install-full" onclick="closeModal()">Đã hiểu</button></div>`;$('modal').classList.remove('hidden')}
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.__deferredPrompt=e});
 if('serviceWorker' in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 function closeModal(){$('modal').classList.add('hidden');$('modalCard').innerHTML=''}
@@ -198,4 +186,3 @@ async function boot(){
  const u=sessionStorage.getItem('demo_user');if(u&&demoAuth[u]){currentUser={name:u,role:demoAuth[u].role,cloud:false};enterApp()}
 }
 window.addEventListener('load',boot);
-window.addEventListener('load',()=>setTimeout(()=>{if(map){map.on('zoomend',updateMarkerLabels);map.invalidateSize()}},500));

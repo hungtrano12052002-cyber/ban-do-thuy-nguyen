@@ -6,14 +6,12 @@
 <title>Bản đồ số Thủy Nguyên</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png"><link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=6.0.1">
 </head>
 <body>
 <div id="login" class="screen">
   <div class="login-card">
-    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6.5</p>
+    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6</p>
     <input id="user" placeholder="Email / tài khoản" value="admin" autocomplete="username">
     <input id="pass" placeholder="Mật khẩu" type="password" value="admin123" autocomplete="current-password">
     <button onclick="login()">Đăng nhập</button>
@@ -22,7 +20,7 @@
 </div>
 <div id="app" class="hidden">
   <header>
-    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6.5</span></div>
+    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6</span></div>
     <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
   </header>
   <div class="toolbar">
@@ -30,12 +28,12 @@
     <select id="statusFilter" onchange="renderAll()"><option value="">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Không hoạt động</option></select>
     <button class="primary admin-only" onclick="openEditor()">＋ Thêm</button>
     <button onclick="locateMe()" title="Vị trí của tôi">◎</button>
-    <button onclick="fitAll()" title="Hiện toàn bộ điểm">⌖</button>
+    <button onclick="fitAll()" title="Hiện toàn bộ điểm">⌖</button><button id="layerBtn" onclick="toggleBaseMap()" title="Đổi bản đồ / vệ tinh">🛰️</button>
     <button class="admin-only" onclick="openDataMenu()" title="Nhập / xuất dữ liệu">⇅</button>
   </div>
   <main>
     <aside id="sidebar"><div id="stats" class="stats"></div><div id="list"></div></aside>
-    <section id="map"></section><div class="map-quick"><button onclick="setBaseMap('street')">🗺️ Bản đồ</button><button onclick="setBaseMap('satellite')">🛰️ Vệ tinh</button><button onclick="fitAll()">⌖ Tất cả điểm</button></div><div class="map-legend"><span><i class="legend-pin active"></i>Đang hoạt động</span><span><i class="legend-pin inactive"></i>Ngừng hoạt động</span></div>
+    <section id="map"></section><button class="map-type-fab" id="layerFab" onclick="toggleBaseMap()">🛰️ <span>Lớp bản đồ</span></button><div id="mapNotice" class="map-notice" onclick="showUnlocated()"></div>
     <div id="detail" class="detail hidden"></div>
   </main>
   <nav class="mobile-nav">
@@ -48,8 +46,7 @@
 <div id="modal" class="modal hidden" onclick="modalBackdrop(event)"><div id="modalCard" class="modal-card"></div></div>
 <div id="toast"></div><input id="importFile" type="file" accept="application/json,.json" hidden onchange="importJson(event)">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
-<script src="data.js"></script><script src="app.js"></script>
+<script src="config.js?v=6.0.1"></script>
+<script src="data.js?v=6.0.1"></script><script src="app.js?v=6.0.1"></script>
 </body></html>
