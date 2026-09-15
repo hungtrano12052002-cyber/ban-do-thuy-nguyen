@@ -100,7 +100,17 @@ function filtered(){
 function isActive(s=''){return !/không hoạt động|ngừng|thu hồi|đóng cửa/i.test(s)}
 function renderAll(){renderStats();renderList();renderMarkers()}
 function renderStats(){const visible=filtered(),active=visible.filter(x=>isActive(x.status)).length,geo=visible.filter(validGeo).length;$('stats').innerHTML=`<div><b>${visible.length}</b><span>Cơ sở</span></div><div><b>${active}</b><span>Hoạt động</span></div><div><b>${geo}</b><span>Có tọa độ</span></div>`}
-function renderList(){const arr=filtered(),list=$('list');list.innerHTML=arr.length?arr.map(x=>`<div class="item ${selectedId===x.id?'selected':''}" onclick="focusPlace('${escJs(x.id)}')"><div class="item-head"><b>${esc(x.name)}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.wardBlock||'Chưa có TDP')} · ${esc(x.officer||'Chưa phân công')}</small><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>`).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`}
+let listQuery='';
+function setListQuery(v){listQuery=normSearch(v);renderList()}
+function renderList(){
+ const base=filtered();
+ const arr=listQuery?base.filter(x=>normSearch([x.name,x.wardBlock,x.ownerName,x.managerName,x.officer,x.ownerPhone,x.managerPhone].join(' ')).includes(listQuery)):base;
+ const list=$('list');
+ const search=`<div class="list-search"><span>🔎</span><input value="${escAttr(listQuery)}" placeholder="Tìm nhanh trong danh sách…" oninput="setListQuery(this.value)"><button onclick="setListQuery('')">×</button></div><div class="list-count">${arr.length} / ${base.length} cơ sở</div>`;
+ const rows=arr.length?arr.map(x=>`<div class="item ${selectedId===x.id?'selected':''}" onclick="openListPlace('${escJs(x.id)}')"><div class="item-head"><b>${esc(x.name)}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.wardBlock||'Chưa có TDP')} · ${esc(x.officer||'Chưa phân công')}</small><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>`).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`;
+ list.innerHTML=search+rows;
+}
+function openListPlace(id){const x=places.find(p=>String(p.id)===String(id));if(!x)return;selectedId=x.id;renderList();showDetail(x);if(innerWidth<=760)document.body.dataset.mobiletab='list'}
 function markerIcon(active,name,selected=false){const show=map&&map.getZoom()>=16;const cls=selected?' selected':'';return L.divIcon({className:'pin-wrap',html:`<div class="v63-marker${cls}"><span class="map-pin ${active?'on':'off'}"><i>⌂</i></span>${show?`<b>${esc(name)}</b>`:''}</div>`,iconSize:[show?210:38,48],iconAnchor:[19,43]})}
 function renderMarkers(){if(!map)return;if(markerCluster)markerCluster.clearLayers();markers=[];filtered().forEach(x=>{if(validGeo(x)){const m=L.marker([x.lat,x.lng],{icon:markerIcon(isActive(x.status),x.name,String(selectedId)===String(x.id)),riseOnHover:true,title:x.name});m.bindTooltip(`<div class="map-tip"><b>${esc(x.name)}</b><span>${esc(x.category||'Cơ sở')}</span><small>${esc(x.wardBlock||'Chưa có TDP')}</small></div>`,{direction:'top',offset:[0,-34],opacity:.98});m.on('click',()=>{selectedId=x.id;renderMarkers();showDetail(x)});if(markerCluster)markerCluster.addLayer(m);else m.addTo(map);markers.push(m)}});updateMapNotice()}
 function updateMapNotice(){const e=$('mapNotice');if(!e)return;const total=filtered().length,geo=filtered().filter(validGeo).length;e.innerHTML=geo?`<b>${geo}</b> điểm đang hiển thị trên bản đồ${geo<total?` · <b>${total-geo}</b> điểm chưa có tọa độ`:''}`:`<b>Chưa có điểm nào có tọa độ.</b> Dữ liệu hiện có ${total} cơ sở nhưng link Google Maps rút gọn chưa cung cấp lat/lng.`;e.classList.toggle('warn',geo<total)}
@@ -114,7 +124,7 @@ function fitAll(){const pts=filtered().filter(validGeo).map(x=>[x.lat,x.lng]);if
 function focusPlace(id){const x=places.find(p=>String(p.id)===String(id));if(!x)return;selectedId=x.id;renderList();if(validGeo(x))map.flyTo([x.lat,x.lng],18,{duration:.7});showDetail(x)}
 function showDetail(x){
  selectedId=x.id;renderList();const d=$('detail');d.classList.remove('hidden');const imgs=(x.images||[]).slice(0,8).map(src=>`<img src="${escAttr(src)}" alt="Ảnh cơ sở" loading="lazy">`).join('');
- d.innerHTML=`<button class="close" onclick="dclose()">×</button><div class="detail-title"><h2>${esc(x.name)}</h2><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>${imgs?`<div class="gallery">${imgs}</div>`:''}${row('TDP / khu vực',x.wardBlock)}${row('Chủ cơ sở',x.ownerName)}${row('Số điện thoại',phoneLink(x.ownerPhone))}${row('Người quản lý',x.managerName)}${row('SĐT quản lý',phoneLink(x.managerPhone))}${row('Địa chỉ quản lý',x.managerAddress)}${row('Cán bộ phụ trách',x.officer)}${row('Quy mô',x.scale)}${row('Pháp lý',x.legal)}${row('Tọa độ',validGeo(x)?`${x.lat}, ${x.lng}`:'Chưa có')}<div class="actions mobile-actions"><a class="route-a" href="${escAttr(directionUrl(x))}" target="_blank" rel="noopener">🧭 Chỉ đường</a>${x.mapsUrl?`<a href="${escAttr(x.mapsUrl)}" target="_blank" rel="noopener">📍 Google Maps</a>`:''}<a class="secondary-a" href="${escAttr(googleImageUrl(x))}" target="_blank" rel="noopener">🖼️ Ảnh Google</a>${validGeo(x)?`<a class="secondary-a" href="${escAttr(streetViewUrl(x))}" target="_blank" rel="noopener">👁 Street View</a>`:''}<button class="secondary" onclick="sharePlace('${escJs(x.id)}')">↗️ Chia sẻ</button>${x.lodgerListUrl?`<a class="secondary-a" href="${escAttr(x.lodgerListUrl)}" target="_blank" rel="noopener">📋 Danh sách</a>`:''}<button class="secondary admin-only" onclick="openEditor('${escJs(x.id)}')">✏️ Sửa</button></div>`;
+ d.innerHTML=`<button class="close" onclick="dclose()">×</button><div class="detail-title"><h2>${esc(x.name)}</h2><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>${imgs?`<div class="gallery">${imgs}</div>`:''}${row('TDP / khu vực',x.wardBlock)}${row('Chủ cơ sở',x.ownerName)}${row('Số điện thoại',phoneLink(x.ownerPhone))}${row('Người quản lý',x.managerName)}${row('SĐT quản lý',phoneLink(x.managerPhone))}${row('Địa chỉ quản lý',x.managerAddress)}${row('Cán bộ phụ trách',x.officer)}${row('Quy mô',x.scale)}${row('Pháp lý',x.legal)}${row('Tọa độ',validGeo(x)?`${x.lat}, ${x.lng}`:'Chưa có')}<div class="actions mobile-actions"><a class="route-a" href="${escAttr(directionUrl(x))}" target="_blank" rel="noopener">🧭 Chỉ đường</a>${x.mapsUrl?`<a href="${escAttr(x.mapsUrl)}" target="_blank" rel="noopener">📍 Google Maps</a>`:''}<a class="secondary-a" href="${escAttr(googleImageUrl(x))}" target="_blank" rel="noopener">🖼️ Ảnh Google</a>${validGeo(x)?`<a class="secondary-a" href="${escAttr(streetViewUrl(x))}" target="_blank" rel="noopener">👁 Street View</a>`:''}<button class="secondary" onclick="sharePlace('${escJs(x.id)}')">↗️ Chia sẻ</button>${x.lodgerListUrl?`<a class="secondary-a" href="${escAttr(x.lodgerListUrl)}" target="_blank" rel="noopener">📋 Danh sách</a>`:''}<button class="direct-edit admin-only" onclick="openEditor('${escJs(x.id)}')">✏️ Chỉnh sửa trực tiếp</button></div>`;
 }
 function row(a,b){return `<div class="row"><label>${esc(a)}</label><div>${b&&String(b).startsWith('<a ')?b:esc(b||'—')}</div></div>`}
 function phoneLink(v){if(!v)return '—';const p=String(v).replace(/\D/g,'');return `<a class="phone" href="tel:${p}">${esc(formatPhone(v))}</a>`}
@@ -408,4 +418,19 @@ openEditor=function(id=null){_v68OpenEditor(id);setTimeout(()=>{
      }
    });
  });
+})();
+
+/* ===== V6.9.1 CROSS-DEVICE / CROSS-BROWSER ===== */
+(function(){
+ function refreshMap(){try{if(map&&map.invalidateSize)map.invalidateSize({pan:false});}catch(e){}}
+ let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(refreshMap,160)});
+ window.addEventListener('orientationchange',()=>setTimeout(refreshMap,300));
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(refreshMap,120)});
+ const oldShow=window.showMobileTab;
+ if(typeof oldShow==='function')window.showMobileTab=function(tab){oldShow(tab);setTimeout(refreshMap,100)};
+ // Prevent a list tap from being swallowed by nested links/buttons on touch browsers.
+ document.addEventListener('click',function(e){const item=e.target.closest&&e.target.closest('.item');if(!item)return;if(e.target.closest('a,button,input,select,textarea'))e.stopPropagation()},true);
+ // iOS/Safari visual viewport: keep bottom sheets above keyboard.
+ if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{document.documentElement.style.setProperty('--vvh',window.visualViewport.height+'px');setTimeout(refreshMap,80)})}
+ setTimeout(refreshMap,400);
 })();
