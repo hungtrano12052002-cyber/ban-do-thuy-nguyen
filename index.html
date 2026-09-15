@@ -8,12 +8,12 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="style.css?v=6.8.2">
+<link rel="stylesheet" href="style.css?v=6.8.3">
 </head>
 <body>
 <div id="login" class="screen">
   <div class="login-card">
-    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6.8.2</p>
+    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6.8.3</p>
     <input id="user" placeholder="Email / tài khoản" value="admin" autocomplete="username">
     <input id="pass" placeholder="Mật khẩu" type="password" value="admin123" autocomplete="current-password">
     <button onclick="login()">Đăng nhập</button>
@@ -22,13 +22,13 @@
 </div>
 <div id="app" class="hidden">
   <header>
-    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6.8.2</span></div>
+    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6.8.3</span></div>
     <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
   </header>
   <div class="toolbar">
     <select id="searchField" onchange="renderAll()"><option value="all">Tất cả trường</option><option value="name">Tên cơ sở</option><option value="category">Loại cơ sở</option><option value="wardBlock">Tổ dân phố</option><option value="officer">Cán bộ phụ trách</option><option value="ownerName">Chủ cơ sở</option><option value="ownerPhone">SĐT chủ cơ sở</option><option value="managerName">Người quản lý</option><option value="managerPhone">SĐT quản lý</option><option value="managerAddress">Địa chỉ quản lý</option><option value="scale">Quy mô</option><option value="legal">Pháp lý</option><option value="status">Tình trạng</option></select><input id="search" placeholder="🔎 Nhập nội dung cần tìm..." oninput="renderAll()">
     <select id="statusFilter" onchange="renderAll()"><option value="">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Không hoạt động</option></select>
-    <button class="overview-btn" onclick="openOverview()">◉ Tổng quan</button><button class="primary admin-only" onclick="openEditor()">＋ Thêm</button>
+    <button class="overview-btn" onclick="openOverview()">◉ Tổng quan</button><button class="primary admin-only" onclick="openAddSafely(event)">＋ Thêm</button>
     <button onclick="locateMe()" title="Vị trí của tôi">◎</button>
     <button onclick="fitAll()" title="Hiện toàn bộ điểm">⌖</button><button id="layerBtn" onclick="openMapLayers()" title="Chọn kiểu bản đồ">▱</button>
     <button class="admin-only" onclick="openDataMenu()" title="Nhập / xuất dữ liệu">⇅</button>
@@ -44,7 +44,7 @@
     <button onclick="showMobileTab('map')">🗺️<span>Bản đồ</span></button>
     <button onclick="showMobileTab('list')">📋<span>Danh sách</span></button>
     <button onclick="locateMe()">◎<span>Vị trí</span></button>
-    <button class="admin-only" onclick="openEditor()">＋<span>Thêm</span></button><button onclick="openInstallHelp()">•••<span>Thêm</span></button>
+    <button class="admin-only" onclick="openAddSafely(event)">＋<span>Thêm</span></button><button onclick="openInstallHelp()">•••<span>Thêm</span></button>
   </nav>
 </div>
 <div id="modal" class="modal hidden" onclick="modalBackdrop(event)"><div id="modalCard" class="modal-card"></div></div>
@@ -53,6 +53,6 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="config.js?v=6.8.2"></script>
-<script src="data.js?v=6.8.2"></script><script src="app.js?v=6.8.2"></script>
+<script src="config.js?v=6.8.3"></script>
+<script src="data.js?v=6.8.3"></script><script src="app.js?v=6.8.3"></script>
 </body></html>

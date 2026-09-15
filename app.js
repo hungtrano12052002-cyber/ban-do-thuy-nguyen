@@ -372,3 +372,26 @@ openEditor=function(id=null){_v68OpenEditor(id);setTimeout(()=>{
  tools.parentNode.insertBefore(box,tools.nextSibling);v68PositionPreview();
  ['f_lat','f_lng'].forEach(k=>$(k)?.addEventListener('input',v68PositionPreview));
  },80)};
+
+
+/* ===== V6.8.3 ADD BUTTON HOTFIX ===== */
+(function(){
+ function openAddSafely(ev){
+   try{
+     if(!currentUser){ toast('Phiên đăng nhập chưa sẵn sàng. Hãy đăng xuất rồi đăng nhập lại.'); return; }
+     if(String(currentUser.role||'').trim().toLowerCase()!=='admin'){ toast('Tài khoản hiện tại không có quyền ADMIN.'); return; }
+     openEditor(null);
+   }catch(err){ console.error('ADD_PLACE_ERROR',err); toast('Không mở được form Thêm: '+(err?.message||err)); }
+ }
+ window.openAddSafely=openAddSafely;
+ window.addEventListener('load',()=>{
+   document.querySelectorAll('.admin-only').forEach(el=>{
+     const text=(el.textContent||'').trim();
+     if((text.includes('Thêm')||el.getAttribute('onclick')==='openEditor()') && el.tagName==='BUTTON'){
+       el.setAttribute('onclick','');
+       el.onclick=openAddSafely;
+       el.style.pointerEvents='auto';
+     }
+   });
+ });
+})();
