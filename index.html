@@ -6,12 +6,14 @@
 <title>Bản đồ số Thủy Nguyên</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png"><link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="style.css?v=6.0.1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<link rel="stylesheet" href="style.css?v=6.7.0">
 </head>
 <body>
 <div id="login" class="screen">
   <div class="login-card">
-    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6</p>
+    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6.7</p>
     <input id="user" placeholder="Email / tài khoản" value="admin" autocomplete="username">
     <input id="pass" placeholder="Mật khẩu" type="password" value="admin123" autocomplete="current-password">
     <button onclick="login()">Đăng nhập</button>
@@ -20,21 +22,23 @@
 </div>
 <div id="app" class="hidden">
   <header>
-    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6</span></div>
+    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6.7</span></div>
     <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
   </header>
   <div class="toolbar">
-    <input id="search" placeholder="🔎 Tìm cơ sở, TDP, chủ cơ sở, cán bộ..." oninput="renderAll()">
+    <select id="searchField" onchange="renderAll()"><option value="all">Tất cả trường</option><option value="name">Tên cơ sở</option><option value="category">Loại cơ sở</option><option value="wardBlock">Tổ dân phố</option><option value="officer">Cán bộ phụ trách</option><option value="ownerName">Chủ cơ sở</option><option value="ownerPhone">SĐT chủ cơ sở</option><option value="managerName">Người quản lý</option><option value="managerPhone">SĐT quản lý</option><option value="managerAddress">Địa chỉ quản lý</option><option value="scale">Quy mô</option><option value="legal">Pháp lý</option><option value="status">Tình trạng</option></select><input id="search" placeholder="🔎 Nhập nội dung cần tìm..." oninput="renderAll()">
     <select id="statusFilter" onchange="renderAll()"><option value="">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Không hoạt động</option></select>
-    <button class="primary admin-only" onclick="openEditor()">＋ Thêm</button>
+    <button class="overview-btn" onclick="openOverview()">◉ Tổng quan</button><button class="primary admin-only" onclick="openEditor()">＋ Thêm</button>
     <button onclick="locateMe()" title="Vị trí của tôi">◎</button>
-    <button onclick="fitAll()" title="Hiện toàn bộ điểm">⌖</button><button id="layerBtn" onclick="toggleBaseMap()" title="Đổi bản đồ / vệ tinh">🛰️</button>
+    <button onclick="fitAll()" title="Hiện toàn bộ điểm">⌖</button><button id="layerBtn" onclick="openMapLayers()" title="Chọn kiểu bản đồ">▱</button>
     <button class="admin-only" onclick="openDataMenu()" title="Nhập / xuất dữ liệu">⇅</button>
   </div>
   <main>
     <aside id="sidebar"><div id="stats" class="stats"></div><div id="list"></div></aside>
-    <section id="map"></section><button class="map-type-fab" id="layerFab" onclick="toggleBaseMap()">🛰️ <span>Lớp bản đồ</span></button><div id="mapNotice" class="map-notice" onclick="showUnlocated()"></div>
-    <div id="detail" class="detail hidden"></div>
+    <section id="map"></section>
+    <div class="v66-map-search"><span>⌕</span><input id="mapQuickSearch" placeholder="Tìm cơ sở, TDP, cán bộ…" oninput="v66QuickSearch(this.value)"><button onclick="v66ClearSearch()">×</button></div>
+    <div class="v66-chips"><button class="active" data-v66="all" onclick="v66Chip(this,'all')">Tất cả</button><button data-v66="active" onclick="v66Chip(this,'active')">Đang hoạt động</button><button data-v66="geo" onclick="v66Chip(this,'geo')">Có vị trí</button><button data-v66="near" onclick="v66NearMe(this)">Gần tôi</button></div><div class="map-compass">N</div><button class="map-type-fab" id="layerFab" onclick="openMapLayers()">▱ <span>Kiểu bản đồ</span></button><div id="mapNotice" class="map-notice" onclick="showUnlocated()"></div>
+    <div id="detail" class="detail hidden"></div><div class="map-accuracy" id="mapAccuracy">📍 0 điểm có tọa độ</div>
   </main>
   <nav class="mobile-nav">
     <button onclick="showMobileTab('map')">🗺️<span>Bản đồ</span></button>
@@ -46,7 +50,9 @@
 <div id="modal" class="modal hidden" onclick="modalBackdrop(event)"><div id="modalCard" class="modal-card"></div></div>
 <div id="toast"></div><input id="importFile" type="file" accept="application/json,.json" hidden onchange="importJson(event)">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=6.0.1"></script>
-<script src="data.js?v=6.0.1"></script><script src="app.js?v=6.0.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="config.js?v=6.7.0"></script>
+<script src="data.js?v=6.7.0"></script><script src="app.js?v=6.7.0"></script>
 </body></html>
