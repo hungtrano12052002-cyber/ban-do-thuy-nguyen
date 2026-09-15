@@ -1,4 +1,4 @@
-V6.8.3 HOTFIX
+V6.8.4 HOTFIX
 - Sửa nút + Thêm không phản hồi.
 - Thêm bắt lỗi và thông báo rõ nếu quyền ADMIN/phiên đăng nhập có vấn đề.
 - Tăng cache version để GitHub Pages/PWA tải mã mới.

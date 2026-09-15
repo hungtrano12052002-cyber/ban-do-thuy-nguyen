@@ -6,6 +6,20 @@ const demoAuth={admin:{pass:'admin123',role:'admin'},user:{pass:'user123',role:'
 const cfg=window.APP_CONFIG||{};
 const cloudEnabled=!!(cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&window.supabase?.createClient);
 
+
+/* ===== V6.8.4 CATEGORY HOTFIX =====
+   Keep this helper global and declared before every editor/normalization call. */
+function inferCategory(name=''){
+  const n=String(name||'').toLowerCase();
+  if(/khách sạn|hotel/.test(n)) return 'Khách sạn';
+  if(/homestay|home stay/.test(n)) return 'Homestay';
+  if(/lán/.test(n)) return 'Lán trọ';
+  if(/nhà cho thuê/.test(n)) return 'Nhà cho thuê';
+  if(/nhà trọ|\btrọ\b/.test(n)) return 'Nhà trọ';
+  return 'Cơ sở lưu trú khác';
+}
+window.inferCategory=inferCategory;
+
 function initCloud(){
   if(!cloudEnabled)return;
   supabaseClient=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
@@ -46,7 +60,7 @@ function subscribeRealtime(){
   realtimeChannel=supabaseClient.channel('places-live').on('postgres_changes',{event:'*',schema:'public',table:'places'},async()=>{await loadCloudPlaces();renderAll();toast('Dữ liệu vừa được đồng bộ từ máy khác.');}).subscribe();
 }
 function normalizePlaces(){places=places.map((x,i)=>{let lat=numOrNull(x.lat),lng=numOrNull(x.lng);if((lat===null||lng===null)&&x.mapsUrl){const m=String(x.mapsUrl).match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)||String(x.mapsUrl).match(/[?&](?:query|destination)=(-?\d+(?:\.\d+)?)(?:%2C|,)(-?\d+(?:\.\d+)?)/i);if(m){lat=Number(m[1]);lng=Number(m[2])}}return {...x,id:String(x.id??Date.now()+i),images:Array.isArray(x.images)?x.images:[],category:x.category||inferCategory(x.name),lat,lng}})
-function inferCategory(name=''){const n=String(name).toLowerCase();if(/khách sạn|hotel/.test(n))return 'Khách sạn';if(/homestay|home stay/.test(n))return 'Homestay';if(/lán/.test(n))return 'Lán trọ';if(/nhà cho thuê/.test(n))return 'Nhà cho thuê';if(/nhà trọ|\btrọ\b/.test(n))return 'Nhà trọ';return 'Cơ sở lưu trú khác'}}
+/* inferCategory is defined globally near the top (V6.8.4). */}
 function numOrNull(v){if(v===''||v===null||v===undefined)return null;const n=Number(v);return Number.isFinite(n)?n:null}
 function persist(){if(!cloudEnabled||!currentUser?.cloud)localStorage.setItem(STORE,JSON.stringify(places))}
 
