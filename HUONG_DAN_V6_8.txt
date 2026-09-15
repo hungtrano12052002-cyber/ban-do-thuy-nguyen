@@ -1,0 +1,18 @@
+BẢN ĐỒ SỐ THỦY NGUYÊN V6.8 - THAY ĐỔI VỊ TRÍ CƠ SỞ
+
+Nâng cấp chính:
+- Trong Sửa cơ sở có khung “Thay đổi vị trí cơ sở”.
+- Cách 1: dán link Google Maps mới -> Cập nhật từ link Google Maps.
+- Cách 2: chọn trực tiếp trên bản đồ.
+- Cách 3: nhập lat/lng.
+- Có xem trước tọa độ và nút mở Google Maps kiểm tra.
+- Link maps.app.goo.gl dùng Edge Function resolve-map-link khi đăng nhập Cloud Admin.
+
+CẬP NHẬT GITHUB PAGES:
+1. Giải nén gói ZIP.
+2. Upload toàn bộ file/folder bên trong lên root repo ban-do-thuy-nguyen.
+3. Commit changes.
+4. Chờ GitHub Pages deploy xanh.
+5. Mở lại trang; nếu PWA còn bản cũ, đóng/mở lại hoặc tải lại Safari.
+
+LƯU Ý: config.js không được tự điền khóa Supabase trong gói này. Giữ/copy cấu hình Supabase của bạn nếu file trên GitHub hiện đã cấu hình.

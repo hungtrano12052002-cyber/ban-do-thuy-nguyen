@@ -1,6 +1,6 @@
 let places=[], map, markers=[], markerCluster=null, currentUser=null, selectedId=null, supabaseClient=null, realtimeChannel=null, baseLayers={}, currentBase='street', tileFailures=0;
 const defaultCenter=[20.96,106.69];
-const STORE='thuynguyen_places_v6';
+const STORE='thuynguyen_places_v68';
 const SEARCH_FIELDS=['name','category','wardBlock','officer','ownerName','ownerPhone','managerName','managerPhone','managerAddress','scale','legal','status'];
 const demoAuth={admin:{pass:'admin123',role:'admin'},user:{pass:'user123',role:'user'}};
 const cfg=window.APP_CONFIG||{};
@@ -347,3 +347,28 @@ const _v67OpenDataMenu=openDataMenu;
 openDataMenu=function(){_v67OpenDataMenu();setTimeout(()=>{const dm=document.querySelector('.data-menu');if(dm&&!$('v67AutoGpsBtn')){const b=document.createElement('button');b.id='v67AutoGpsBtn';b.innerHTML='📌 Tự lấy tọa độ Google Maps';b.onclick=openAutoGps;dm.prepend(b)}},20)};
 function v67Toolbar(){const top=document.querySelector('.toolbar');if(top&&!$('v67AutoGpsTop')){const b=document.createElement('button');b.id='v67AutoGpsTop';b.className='admin-only v67-auto-btn';b.title='Tự lấy tọa độ từ Google Maps';b.innerHTML='📌 <span>Auto GPS</span>';b.onclick=openAutoGps;top.appendChild(b)}}
 setTimeout(v67Toolbar,1000);
+
+
+/* ===== V6.8 POSITION EDITOR ===== */
+async function v68ApplyGoogleLink(){
+ const url=$('f_mapsUrl')?.value.trim(); if(!url)return toast('Hãy dán link Google Maps mới.');
+ const direct=parseCoords(url);
+ if(direct){$('f_lat').value=Number(direct[0]).toFixed(7);$('f_lng').value=Number(direct[1]).toFixed(7);v68PositionPreview();return toast('Đã cập nhật tọa độ từ link Google Maps. Bấm Lưu để hoàn tất.');}
+ if(!v67ResolverReady())return toast('Link rút gọn cần đăng nhập Cloud Admin để lấy tọa độ.');
+ const b=$('v68LinkBtn');if(b){b.disabled=true;b.textContent='⏳ Đang lấy vị trí…'}
+ try{const res=await v67CallResolver({mapsUrl:url});$('f_lat').value=Number(res.lat).toFixed(7);$('f_lng').value=Number(res.lng).toFixed(7);if(res.finalUrl)$('f_mapsUrl').value=res.finalUrl;v68PositionPreview();toast('Đã nhận vị trí mới. Bấm Lưu để cập nhật cơ sở.');}
+ catch(e){toast('Không lấy được vị trí: '+(e.message||e))}finally{if(b){b.disabled=false;b.textContent='🔗 Cập nhật từ link Google Maps'}}
+}
+function v68PositionPreview(){const e=$('v68PosPreview');if(!e)return;const lat=numOrNull($('f_lat')?.value),lng=numOrNull($('f_lng')?.value);e.innerHTML=(lat!==null&&lng!==null)?`<b>Vị trí sẽ lưu:</b> ${lat.toFixed(7)}, ${lng.toFixed(7)} <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" rel="noopener">Mở kiểm tra ↗</a>`:'Chưa có tọa độ hợp lệ.'}
+function v68PickOnMap(){startPinPicker()}
+const _v68OpenEditor=openEditor;
+openEditor=function(id=null){_v68OpenEditor(id);setTimeout(()=>{
+ const tools=document.querySelector('.coord-tools');if(!tools||$('v68PositionBox'))return;
+ tools.style.display='none';
+ const box=document.createElement('section');box.id='v68PositionBox';box.className='v68-position-box';
+ box.innerHTML=`<div class="v68-position-title"><b>📍 Thay đổi vị trí cơ sở</b><small>Chọn một trong 3 cách dưới đây</small></div>
+ <div class="v68-position-actions"><button type="button" id="v68LinkBtn" onclick="v68ApplyGoogleLink()">🔗 Cập nhật từ link Google Maps</button><button type="button" class="primary" onclick="v68PickOnMap()">🗺️ Chọn trực tiếp trên bản đồ</button><button type="button" onclick="document.getElementById('f_lat').focus()">⌨️ Nhập lat / lng</button></div>
+ <div id="v68PosPreview" class="v68-position-preview"></div><div class="v68-help">Dán link Google Maps mới vào ô <b>Link Google Maps</b> phía trên. Với link rút gọn <code>maps.app.goo.gl</code>, Cloud Admin sẽ tự giải link. Sau khi vị trí đúng, bấm <b>Lưu</b>.</div>`;
+ tools.parentNode.insertBefore(box,tools.nextSibling);v68PositionPreview();
+ ['f_lat','f_lng'].forEach(k=>$(k)?.addEventListener('input',v68PositionPreview));
+ },80)};
