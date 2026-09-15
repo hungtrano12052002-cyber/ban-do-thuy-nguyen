@@ -30,14 +30,14 @@ async function init(){
 function loadLocalPlaces(){
   const saved=localStorage.getItem(STORE)||localStorage.getItem('thuynguyen_places_v4');
   if(saved){try{places=JSON.parse(saved)}catch(e){places=[]}}
-  if(!places.length)places=structuredClone(window.INITIAL_PLACES||[]);
+  if(!places.length)places=JSON.parse(JSON.stringify(window.INITIAL_PLACES||[]));
   normalizePlaces();
 }
 async function loadCloudPlaces(){
   const {data,error}=await supabaseClient.from('places').select('id,data').order('updated_at',{ascending:false});
   if(error){toast('Không tải được dữ liệu cloud: '+error.message);loadLocalPlaces();return;}
   places=(data||[]).map(r=>({...r.data,id:r.id}));
-  if(!places.length)places=structuredClone(window.INITIAL_PLACES||[]);
+  if(!places.length)places=JSON.parse(JSON.stringify(window.INITIAL_PLACES||[]));
   normalizePlaces();
 }
 function subscribeRealtime(){
@@ -108,9 +108,9 @@ function formatPhone(v){let s=String(v).trim();if(/^\d{9}$/.test(s))s='0'+s;retu
 function dclose(){selectedId=null;$('detail').classList.add('hidden');renderList()}
 
 function openEditor(id=null){
- if(currentUser.role!=='admin')return toast('Chỉ ADMIN được chỉnh sửa dữ liệu.');
+ if(!currentUser||String(currentUser.role||'').toLowerCase()!=='admin')return toast('Bạn cần đăng nhập ADMIN để thêm/sửa cơ sở.');
  const x=id!==null?places.find(p=>String(p.id)===String(id)):null;
- const p=x?structuredClone(x):{id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name:'',mapsUrl:'',lodgerListUrl:'',ownerName:'',ownerPhone:'',wardBlock:'',managerName:'',managerPhone:'',managerAddress:'',officer:'',scale:'',legal:'',status:'Vẫn Hoạt động',lat:null,lng:null,images:[]};
+ const p=x?JSON.parse(JSON.stringify(x)):{id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name:'',mapsUrl:'',lodgerListUrl:'',ownerName:'',ownerPhone:'',wardBlock:'',managerName:'',managerPhone:'',managerAddress:'',officer:'',scale:'',legal:'',status:'Vẫn Hoạt động',lat:null,lng:null,images:[]};
  $('modalCard').innerHTML=`<div class="modal-head"><h2>${x?'Sửa cơ sở':'Thêm cơ sở'}</h2><button onclick="closeModal()">×</button></div><form id="placeForm" onsubmit="savePlace(event,'${escJs(p.id)}')"><div class="form-grid">${field('Tên cơ sở','f_name',p.name,true)}${field('Loại cơ sở','f_category',p.category||inferCategory(p.name))}${field('TDP / khu vực','f_wardBlock',p.wardBlock)}${field('Chủ cơ sở','f_ownerName',p.ownerName)}${field('SĐT chủ cơ sở','f_ownerPhone',p.ownerPhone,'','tel')}${field('Người quản lý','f_managerName',p.managerName)}${field('SĐT quản lý','f_managerPhone',p.managerPhone,'','tel')}${field('Địa chỉ quản lý','f_managerAddress',p.managerAddress,false,'text','wide')}${field('Cán bộ phụ trách','f_officer',p.officer)}${field('Quy mô','f_scale',p.scale)}${field('Tình trạng','f_status',p.status)}${field('Pháp lý','f_legal',p.legal,false,'text','wide')}${field('Link Google Maps','f_mapsUrl',p.mapsUrl,false,'url','wide')}${field('Link danh sách lưu trú','f_lodgerListUrl',p.lodgerListUrl,false,'url','wide')}${field('Vĩ độ (lat)','f_lat',p.lat??'',false,'number')}${field('Kinh độ (lng)','f_lng',p.lng??'',false,'number')}</div><div class="coord-tools"><button type="button" onclick="coordsFromLink()">📌 Tách tọa độ từ link</button><button type="button" onclick="pickMapCenter()">🎯 Lấy tâm bản đồ hiện tại</button></div><div class="image-editor"><label>Ảnh cơ sở <small>${currentUser.cloud?'(sẽ tải lên cloud khi lưu)':'(lưu trên thiết bị)'}</small></label><input id="f_images" type="file" accept="image/*" multiple onchange="previewImages(event)"><div id="imagePreview" class="gallery edit-gallery">${(p.images||[]).map(src=>`<div class="img-box" data-existing="1"><img src="${escAttr(src)}"><button type="button" onclick="this.parentElement.remove()">×</button></div>`).join('')}</div></div><div class="form-actions">${x?`<button type="button" class="danger" onclick="deletePlace('${escJs(p.id)}')">Xóa</button>`:''}<span></span><button type="button" class="ghost" onclick="closeModal()">Hủy</button><button class="primary" type="submit">Lưu</button></div></form>`;
  $('modal').classList.remove('hidden');
 }
@@ -177,7 +177,7 @@ async function seedCloud(){
 async function refreshCloud(){closeModal();await loadCloudPlaces();renderAll();toast('Đã tải dữ liệu mới nhất từ cloud.')}
 function exportJson(){const blob=new Blob([JSON.stringify(places,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`thuy-nguyen-data-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast('Đã xuất dữ liệu JSON.')}
 async function importJson(e){const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data))throw 0;places=data;normalizePlaces();persist();renderAll();toast(`Đã nhập ${places.length} cơ sở.`)}catch{toast('File JSON không hợp lệ.')}e.target.value=''}
-async function resetData(){if(!confirm('Khôi phục dữ liệu gốc sẽ xóa các thay đổi cục bộ. Tiếp tục?'))return;localStorage.removeItem(STORE);places=structuredClone(window.INITIAL_PLACES||[]);normalizePlaces();closeModal();dclose();renderAll();toast('Đã khôi phục dữ liệu gốc.')}
+async function resetData(){if(!confirm('Khôi phục dữ liệu gốc sẽ xóa các thay đổi cục bộ. Tiếp tục?'))return;localStorage.removeItem(STORE);places=JSON.parse(JSON.stringify(window.INITIAL_PLACES||[]));normalizePlaces();closeModal();dclose();renderAll();toast('Đã khôi phục dữ liệu gốc.')}
 
 function directionUrl(x){const dest=validGeo(x)?`${x.lat},${x.lng}`:[x.name,x.wardBlock,'Thủy Nguyên Hải Phòng'].filter(Boolean).join(', ');return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=driving`}
 function googleImageUrl(x){const q=[x.name,x.wardBlock,'Thủy Nguyên Hải Phòng'].filter(Boolean).join(' ');return `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`}
@@ -349,7 +349,7 @@ function v67Toolbar(){const top=document.querySelector('.toolbar');if(top&&!$('v
 setTimeout(v67Toolbar,1000);
 
 
-/* ===== V6.8 POSITION EDITOR ===== */
+/* ===== V6.8.1 POSITION EDITOR ===== */
 async function v68ApplyGoogleLink(){
  const url=$('f_mapsUrl')?.value.trim(); if(!url)return toast('Hãy dán link Google Maps mới.');
  const direct=parseCoords(url);

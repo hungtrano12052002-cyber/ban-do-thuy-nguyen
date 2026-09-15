@@ -1,8 +1,8 @@
 {
-  "name": "Bản đồ số Thủy Nguyên Mobile V6.8",
+  "name": "Bản đồ số Thủy Nguyên Mobile V6.8.2",
   "short_name": "Thủy Nguyên",
   "description": "Quản lý cơ sở, tra cứu bản đồ, chỉ đường và hình ảnh Google.",
-  "id": "thuy-nguyen-map-v68",
+  "id": "thuy-nguyen-map-v682",
   "start_url": "./index.html?source=pwa",
   "scope": "./",
   "display": "standalone",
