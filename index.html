@@ -6,13 +6,14 @@
 <title>Bản đồ số Thủy Nguyên</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png"><link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="login" class="screen">
   <div class="login-card">
-    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6.3 Premium</p>
+    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6.5</p>
     <input id="user" placeholder="Email / tài khoản" value="admin" autocomplete="username">
     <input id="pass" placeholder="Mật khẩu" type="password" value="admin123" autocomplete="current-password">
     <button onclick="login()">Đăng nhập</button>
@@ -21,8 +22,8 @@
 </div>
 <div id="app" class="hidden">
   <header>
-    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6.3</span></div>
-    <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="cloud-btn" onclick="openCloudSetup()">☁ Cloud</button><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
+    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6.5</span></div>
+    <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
   </header>
   <div class="toolbar">
     <input id="search" placeholder="🔎 Tìm cơ sở, TDP, chủ cơ sở, cán bộ..." oninput="renderAll()">
@@ -34,7 +35,7 @@
   </div>
   <main>
     <aside id="sidebar"><div id="stats" class="stats"></div><div id="list"></div></aside>
-    <section id="map"></section>
+    <section id="map"></section><div class="map-quick"><button onclick="setBaseMap('street')">🗺️ Bản đồ</button><button onclick="setBaseMap('satellite')">🛰️ Vệ tinh</button><button onclick="fitAll()">⌖ Tất cả điểm</button></div><div class="map-legend"><span><i class="legend-pin active"></i>Đang hoạt động</span><span><i class="legend-pin inactive"></i>Ngừng hoạt động</span></div>
     <div id="detail" class="detail hidden"></div>
   </main>
   <nav class="mobile-nav">
