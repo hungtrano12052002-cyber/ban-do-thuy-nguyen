@@ -1,7 +1,7 @@
 let places=[], map, markers=[], markerCluster=null, currentUser=null, selectedId=null, supabaseClient=null, realtimeChannel=null, baseLayers={}, currentBase='street', tileFailures=0;
 const defaultCenter=[20.96,106.69];
 const STORE='thuynguyen_places_v68';
-const SEARCH_FIELDS=['name','category','wardBlock','officer','ownerName','ownerPhone','managerName','managerPhone','managerAddress','scale','legal','status'];
+const SEARCH_FIELDS=['name','category','wardBlock','officer','ownerName','ownerPhone','managerName','managerPhone','managerAddress','scale','legal','status','lodgerListUrl'];
 const demoAuth={admin:{pass:'admin123',role:'admin'},user:{pass:'user123',role:'user'}};
 const cfg=window.APP_CONFIG||{};
 const cloudEnabled=!!(cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&window.supabase?.createClient);
@@ -101,13 +101,19 @@ function isActive(s=''){return !/không hoạt động|ngừng|thu hồi|đóng 
 function renderAll(){renderStats();renderList();renderMarkers()}
 function renderStats(){const visible=filtered(),active=visible.filter(x=>isActive(x.status)).length,geo=visible.filter(validGeo).length;$('stats').innerHTML=`<div><b>${visible.length}</b><span>Cơ sở</span></div><div><b>${active}</b><span>Hoạt động</span></div><div><b>${geo}</b><span>Có tọa độ</span></div>`}
 let listQuery='';
+function safeHttpUrl(v=''){
+  const raw=String(v||'').trim(); if(!raw)return '';
+  try{const u=new URL(raw);return /^https?:$/.test(u.protocol)?u.href:''}catch(e){return ''}
+}
+function lodgerSheetUrl(x){return safeHttpUrl(x?.lodgerListUrl||'')}
+function openLodgerSheet(id,e){if(e){e.preventDefault();e.stopPropagation()}const x=places.find(p=>String(p.id)===String(id));const url=lodgerSheetUrl(x);if(!url)return toast('Cơ sở này chưa có link Google Trang tính danh sách người lưu trú.');window.open(url,'_blank','noopener,noreferrer')}
 function setListQuery(v){listQuery=normSearch(v);renderList()}
 function renderList(){
  const base=filtered();
  const arr=listQuery?base.filter(x=>normSearch([x.name,x.wardBlock,x.ownerName,x.managerName,x.officer,x.ownerPhone,x.managerPhone].join(' ')).includes(listQuery)):base;
  const list=$('list');
  const search=`<div class="list-search"><span>🔎</span><input value="${escAttr(listQuery)}" placeholder="Tìm nhanh trong danh sách…" oninput="setListQuery(this.value)"><button onclick="setListQuery('')">×</button></div><div class="list-count">${arr.length} / ${base.length} cơ sở</div>`;
- const rows=arr.length?arr.map(x=>`<div class="item ${selectedId===x.id?'selected':''}" onclick="openListPlace('${escJs(x.id)}')"><div class="item-head"><b>${esc(x.name)}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.wardBlock||'Chưa có TDP')} · ${esc(x.officer||'Chưa phân công')}</small><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>`).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`;
+ const rows=arr.length?arr.map(x=>`<div class="item ${selectedId===x.id?'selected':''}" onclick="openListPlace('${escJs(x.id)}')"><div class="item-head"><b>${esc(x.name)}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.wardBlock||'Chưa có TDP')} · ${esc(x.officer||'Chưa phân công')}</small><div class="item-foot"><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span>${lodgerSheetUrl(x)?`<button class="sheet-mini" onclick="openLodgerSheet('${escJs(x.id)}',event)" title="Mở danh sách người lưu trú">📋 Người lưu trú</button>`:''}</div></div>`).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`;
  list.innerHTML=search+rows;
 }
 function openListPlace(id){const x=places.find(p=>String(p.id)===String(id));if(!x)return;selectedId=x.id;renderList();showDetail(x);if(innerWidth<=760)document.body.dataset.mobiletab='list'}
@@ -124,7 +130,7 @@ function fitAll(){const pts=filtered().filter(validGeo).map(x=>[x.lat,x.lng]);if
 function focusPlace(id){const x=places.find(p=>String(p.id)===String(id));if(!x)return;selectedId=x.id;renderList();if(validGeo(x))map.flyTo([x.lat,x.lng],18,{duration:.7});showDetail(x)}
 function showDetail(x){
  selectedId=x.id;renderList();const d=$('detail');d.classList.remove('hidden');const imgs=(x.images||[]).slice(0,8).map(src=>`<img src="${escAttr(src)}" alt="Ảnh cơ sở" loading="lazy">`).join('');
- d.innerHTML=`<button class="close" onclick="dclose()">×</button><div class="detail-title"><h2>${esc(x.name)}</h2><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>${imgs?`<div class="gallery">${imgs}</div>`:''}${row('TDP / khu vực',x.wardBlock)}${row('Chủ cơ sở',x.ownerName)}${row('Số điện thoại',phoneLink(x.ownerPhone))}${row('Người quản lý',x.managerName)}${row('SĐT quản lý',phoneLink(x.managerPhone))}${row('Địa chỉ quản lý',x.managerAddress)}${row('Cán bộ phụ trách',x.officer)}${row('Quy mô',x.scale)}${row('Pháp lý',x.legal)}${row('Tọa độ',validGeo(x)?`${x.lat}, ${x.lng}`:'Chưa có')}<div class="actions mobile-actions"><a class="route-a" href="${escAttr(directionUrl(x))}" target="_blank" rel="noopener">🧭 Chỉ đường</a>${x.mapsUrl?`<a href="${escAttr(x.mapsUrl)}" target="_blank" rel="noopener">📍 Google Maps</a>`:''}<a class="secondary-a" href="${escAttr(googleImageUrl(x))}" target="_blank" rel="noopener">🖼️ Ảnh Google</a>${validGeo(x)?`<a class="secondary-a" href="${escAttr(streetViewUrl(x))}" target="_blank" rel="noopener">👁 Street View</a>`:''}<button class="secondary" onclick="sharePlace('${escJs(x.id)}')">↗️ Chia sẻ</button>${x.lodgerListUrl?`<a class="secondary-a" href="${escAttr(x.lodgerListUrl)}" target="_blank" rel="noopener">📋 Danh sách</a>`:''}<button class="direct-edit admin-only" onclick="openEditor('${escJs(x.id)}')">✏️ Chỉnh sửa trực tiếp</button></div>`;
+ d.innerHTML=`<button class="close" onclick="dclose()">×</button><div class="detail-title"><h2>${esc(x.name)}</h2><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>${imgs?`<div class="gallery">${imgs}</div>`:''}${row('TDP / khu vực',x.wardBlock)}${row('Chủ cơ sở',x.ownerName)}${row('Số điện thoại',phoneLink(x.ownerPhone))}${row('Người quản lý',x.managerName)}${row('SĐT quản lý',phoneLink(x.managerPhone))}${row('Địa chỉ quản lý',x.managerAddress)}${row('Cán bộ phụ trách',x.officer)}${row('Quy mô',x.scale)}${row('Pháp lý',x.legal)}${row('Danh sách người lưu trú',lodgerSheetUrl(x)?`<a class="sheet-link" href="${escAttr(lodgerSheetUrl(x))}" target="_blank" rel="noopener noreferrer">📊 Mở Google Trang tính</a>`:'Chưa liên kết')}${row('Tọa độ',validGeo(x)?`${x.lat}, ${x.lng}`:'Chưa có')}<div class="actions mobile-actions"><a class="route-a" href="${escAttr(directionUrl(x))}" target="_blank" rel="noopener">🧭 Chỉ đường</a>${x.mapsUrl?`<a href="${escAttr(x.mapsUrl)}" target="_blank" rel="noopener">📍 Google Maps</a>`:''}<a class="secondary-a" href="${escAttr(googleImageUrl(x))}" target="_blank" rel="noopener">🖼️ Ảnh Google</a>${validGeo(x)?`<a class="secondary-a" href="${escAttr(streetViewUrl(x))}" target="_blank" rel="noopener">👁 Street View</a>`:''}<button class="secondary" onclick="sharePlace('${escJs(x.id)}')">↗️ Chia sẻ</button>${x.lodgerListUrl?`<a class="secondary-a" href="${escAttr(x.lodgerListUrl)}" target="_blank" rel="noopener">📊 Google Trang tính</a>`:''}<button class="direct-edit admin-only" onclick="openEditor('${escJs(x.id)}')">✏️ Chỉnh sửa trực tiếp</button></div>`;
 }
 function row(a,b){return `<div class="row"><label>${esc(a)}</label><div>${b&&String(b).startsWith('<a ')?b:esc(b||'—')}</div></div>`}
 function phoneLink(v){if(!v)return '—';const p=String(v).replace(/\D/g,'');return `<a class="phone" href="tel:${p}">${esc(formatPhone(v))}</a>`}
@@ -134,9 +140,10 @@ function dclose(){selectedId=null;$('detail').classList.add('hidden');renderList
 function openEditor(id=null){
  if(!currentUser||String(currentUser.role||'').toLowerCase()!=='admin')return toast('Bạn cần đăng nhập ADMIN để thêm/sửa cơ sở.');
  const x=id!==null?places.find(p=>String(p.id)===String(id)):null;
- const p=x?JSON.parse(JSON.stringify(x)):{id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name:'',mapsUrl:'',lodgerListUrl:'',ownerName:'',ownerPhone:'',wardBlock:'',managerName:'',managerPhone:'',managerAddress:'',officer:'',scale:'',legal:'',status:'Vẫn Hoạt động',lat:null,lng:null,images:[]};
- $('modalCard').innerHTML=`<div class="modal-head"><h2>${x?'Sửa cơ sở':'Thêm cơ sở'}</h2><button onclick="closeModal()">×</button></div><form id="placeForm" onsubmit="savePlace(event,'${escJs(p.id)}')"><div class="form-grid">${field('Tên cơ sở','f_name',p.name,true)}${field('Loại cơ sở','f_category',p.category||inferCategory(p.name))}${field('TDP / khu vực','f_wardBlock',p.wardBlock)}${field('Chủ cơ sở','f_ownerName',p.ownerName)}${field('SĐT chủ cơ sở','f_ownerPhone',p.ownerPhone,'','tel')}${field('Người quản lý','f_managerName',p.managerName)}${field('SĐT quản lý','f_managerPhone',p.managerPhone,'','tel')}${field('Địa chỉ quản lý','f_managerAddress',p.managerAddress,false,'text','wide')}${field('Cán bộ phụ trách','f_officer',p.officer)}${field('Quy mô','f_scale',p.scale)}${field('Tình trạng','f_status',p.status)}${field('Pháp lý','f_legal',p.legal,false,'text','wide')}${field('Link Google Maps','f_mapsUrl',p.mapsUrl,false,'url','wide')}${field('Link danh sách lưu trú','f_lodgerListUrl',p.lodgerListUrl,false,'url','wide')}${field('Vĩ độ (lat)','f_lat',p.lat??'',false,'number')}${field('Kinh độ (lng)','f_lng',p.lng??'',false,'number')}</div><div class="coord-tools"><button type="button" onclick="coordsFromLink()">📌 Tách tọa độ từ link</button><button type="button" onclick="pickMapCenter()">🎯 Lấy tâm bản đồ hiện tại</button></div><div class="image-editor"><label>Ảnh cơ sở <small>${currentUser.cloud?'(sẽ tải lên cloud khi lưu)':'(lưu trên thiết bị)'}</small></label><input id="f_images" type="file" accept="image/*" multiple onchange="previewImages(event)"><div id="imagePreview" class="gallery edit-gallery">${(p.images||[]).map(src=>`<div class="img-box" data-existing="1"><img src="${escAttr(src)}"><button type="button" onclick="this.parentElement.remove()">×</button></div>`).join('')}</div></div><div class="form-actions">${x?`<button type="button" class="danger" onclick="deletePlace('${escJs(p.id)}')">Xóa</button>`:''}<span></span><button type="button" class="ghost" onclick="closeModal()">Hủy</button><button class="primary" type="submit">Lưu</button></div></form>`;
+ const p=x?JSON.parse(JSON.stringify(x)):{id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name:'',mapsUrl:'',lodgerListUrl:'',residentsText:'',residents:[],ownerName:'',ownerPhone:'',wardBlock:'',managerName:'',managerPhone:'',managerAddress:'',officer:'',scale:'',legal:'',status:'Vẫn Hoạt động',lat:null,lng:null,images:[]};
+ $('modalCard').innerHTML=`<div class="modal-head"><h2>${x?'Sửa cơ sở':'Thêm cơ sở'}</h2><button onclick="closeModal()">×</button></div><form id="placeForm" onsubmit="savePlace(event,'${escJs(p.id)}')"><div class="form-grid">${field('Tên cơ sở','f_name',p.name,true)}${field('Loại cơ sở','f_category',p.category||inferCategory(p.name))}${field('TDP / khu vực','f_wardBlock',p.wardBlock)}${field('Chủ cơ sở','f_ownerName',p.ownerName)}${field('SĐT chủ cơ sở','f_ownerPhone',p.ownerPhone,'','tel')}${field('Người quản lý','f_managerName',p.managerName)}${field('SĐT quản lý','f_managerPhone',p.managerPhone,'','tel')}${field('Địa chỉ quản lý','f_managerAddress',p.managerAddress,false,'text','wide')}${field('Cán bộ phụ trách','f_officer',p.officer)}${field('Quy mô','f_scale',p.scale)}${field('Tình trạng','f_status',p.status)}${field('Pháp lý','f_legal',p.legal,false,'text','wide')}${field('Link Google Maps','f_mapsUrl',p.mapsUrl,false,'url','wide')}${field('Google Trang tính – danh sách người lưu trú','f_lodgerListUrl',p.lodgerListUrl,false,'url','wide')}<label class="wide resident-editor"><span>Danh sách người cư trú (nhập trực tiếp)</span><textarea id="f_residentsText" rows="7" placeholder="Mỗi người một dòng. Ví dụ: Nguyễn Văn A | 0123456789 | CCCD...">${esc(p.residentsText||'')}</textarea><small>Có thể nhập nhanh tại đây, gắn Google Sheet, hoặc quản lý từng người ở bảng bên dưới.</small></label><div class="wide v72-resident-manager"><div class="v72-rm-head"><div><b>👥 Quản lý người cư trú</b><small>Thêm / sửa / xóa từng người</small></div><button type="button" class="secondary" onclick="v72AddResidentRow()">＋ Thêm người</button></div><div id="v72ResidentRows" class="v72-resident-rows"></div></div>${field('Vĩ độ (lat)','f_lat',p.lat??'',false,'number')}${field('Kinh độ (lng)','f_lng',p.lng??'',false,'number')}</div><div class="coord-tools"><button type="button" onclick="coordsFromLink()">📌 Tách tọa độ từ link</button><button type="button" onclick="pickMapCenter()">🎯 Lấy tâm bản đồ hiện tại</button></div><div class="image-editor"><label>Ảnh cơ sở <small>${currentUser.cloud?'(sẽ tải lên cloud khi lưu)':'(lưu trên thiết bị)'}</small></label><input id="f_images" type="file" accept="image/*" multiple onchange="previewImages(event)"><div id="imagePreview" class="gallery edit-gallery">${(p.images||[]).map(src=>`<div class="img-box" data-existing="1"><img src="${escAttr(src)}"><button type="button" onclick="this.parentElement.remove()">×</button></div>`).join('')}</div></div><div class="form-actions">${x?`<button type="button" class="danger" onclick="deletePlace('${escJs(p.id)}')">Xóa</button>`:''}<span></span><button type="button" class="ghost" onclick="closeModal()">Hủy</button><button class="primary" type="submit">Lưu</button></div></form>`;
  $('modal').classList.remove('hidden');
+ v72RenderResidentEditor(Array.isArray(p.residents)?p.residents:[]);
 }
 function field(label,id,val,required=false,type='text',cls=''){return `<label class="field ${cls}"><span>${label}</span><input id="${id}" type="${type}" ${type==='number'?'step="any"':''} value="${escAttr(val??'')}" ${required?'required':''}></label>`}
 function coordsFromLink(){const url=$('f_mapsUrl').value.trim();if(!url)return toast('Hãy dán link Google Maps trước.');const c=parseCoords(url);if(!c)return toast('Link rút gọn không chứa tọa độ. Hãy mở link và dán URL đầy đủ hoặc nhập tọa độ.');$('f_lat').value=c[0];$('f_lng').value=c[1];toast('Đã lấy tọa độ từ link.')}
@@ -162,7 +169,8 @@ async function savePlace(e,id){
  try{
    const old=places.find(p=>String(p.id)===String(id));
    const images=currentUser.cloud?await uploadNewImages(id):[...document.querySelectorAll('#imagePreview img')].map(i=>i.src);
-   const obj={...(old||{}),id:String(id),name:$('f_name').value.trim(),category:$('f_category').value.trim()||inferCategory($('f_name').value),wardBlock:$('f_wardBlock').value.trim(),ownerName:$('f_ownerName').value.trim(),ownerPhone:$('f_ownerPhone').value.trim(),managerName:$('f_managerName').value.trim(),managerPhone:$('f_managerPhone').value.trim(),managerAddress:$('f_managerAddress').value.trim(),officer:$('f_officer').value.trim(),scale:$('f_scale').value.trim(),status:$('f_status').value.trim(),legal:$('f_legal').value.trim(),mapsUrl:$('f_mapsUrl').value.trim(),lodgerListUrl:$('f_lodgerListUrl').value.trim(),lat:numOrNull($('f_lat').value),lng:numOrNull($('f_lng').value),images};
+   const sheetRaw=$('f_lodgerListUrl').value.trim(); if(sheetRaw&&!safeHttpUrl(sheetRaw))throw new Error('Link Google Trang tính không hợp lệ. Hãy dán link bắt đầu bằng https://');
+   const obj={...(old||{}),id:String(id),name:$('f_name').value.trim(),category:$('f_category').value.trim()||inferCategory($('f_name').value),wardBlock:$('f_wardBlock').value.trim(),ownerName:$('f_ownerName').value.trim(),ownerPhone:$('f_ownerPhone').value.trim(),managerName:$('f_managerName').value.trim(),managerPhone:$('f_managerPhone').value.trim(),managerAddress:$('f_managerAddress').value.trim(),officer:$('f_officer').value.trim(),scale:$('f_scale').value.trim(),status:$('f_status').value.trim(),legal:$('f_legal').value.trim(),mapsUrl:$('f_mapsUrl').value.trim(),lodgerListUrl:$('f_lodgerListUrl').value.trim(),residentsText:$('f_residentsText')?.value.trim()||'',residents:v72CollectResidents(),lat:numOrNull($('f_lat').value),lng:numOrNull($('f_lng').value),images};
    if(currentUser.cloud){
      const {error}=await supabaseClient.from('places').upsert({id:String(id),data:obj,updated_at:new Date().toISOString(),updated_by:currentUser.id});if(error)throw error;
      await loadCloudPlaces();toast('Đã lưu và đồng bộ lên cloud.');
@@ -429,8 +437,139 @@ openEditor=function(id=null){_v68OpenEditor(id);setTimeout(()=>{
  const oldShow=window.showMobileTab;
  if(typeof oldShow==='function')window.showMobileTab=function(tab){oldShow(tab);setTimeout(refreshMap,100)};
  // Prevent a list tap from being swallowed by nested links/buttons on touch browsers.
- document.addEventListener('click',function(e){const item=e.target.closest&&e.target.closest('.item');if(!item)return;if(e.target.closest('a,button,input,select,textarea'))e.stopPropagation()},true);
+ // V7: nested controls stop bubbling themselves; do not intercept list-card clicks in capture phase.
  // iOS/Safari visual viewport: keep bottom sheets above keyboard.
  if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{document.documentElement.style.setProperty('--vvh',window.visualViewport.height+'px');setTimeout(refreshMap,80)})}
  setTimeout(refreshMap,400);
 })();
+
+
+/* ===== V7.0 LIST / DETAIL / RESIDENTS / IMAGE RELIABILITY ===== */
+function v7ResidentLines(x){return String(x?.residentsText||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean)}
+function v7ResidentBlock(x){const lines=v7ResidentLines(x),sheet=lodgerSheetUrl(x);return `<section class="v7-residents"><div class="v7-section-head"><b>👥 Danh sách người cư trú</b><span>${lines.length?lines.length+' dòng đã nhập':''}</span></div>${lines.length?`<div class="v7-resident-list">${lines.map((v,i)=>`<div><strong>${i+1}</strong><span>${esc(v)}</span></div>`).join('')}</div>`:'<div class="v7-empty">Chưa nhập danh sách trực tiếp.</div>'}${sheet?`<a class="sheet-link v7-sheet" href="${escAttr(sheet)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">📊 Mở Google Trang tính</a>`:''}</section>`}
+function v7SafeImages(x){return (Array.isArray(x?.images)?x.images:[]).filter(src=>safeHttpUrl(src)).slice(0,8).map(src=>`<img src="${escAttr(src)}" alt="Ảnh cơ sở" loading="lazy" decoding="async" onerror="this.closest('.v7-imgwrap')?.remove()">`).map(v=>`<div class="v7-imgwrap">${v}</div>`).join('')}
+showDetail=function(x){
+ if(!x)return;selectedId=x.id;renderList();const d=$('detail');if(!d)return;d.classList.remove('hidden');
+ const imgs=v7SafeImages(x);
+ d.innerHTML=`<button class="close" onclick="dclose()">×</button><div class="detail-title"><h2>${esc(x.name||'Cơ sở')}</h2><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span></div>${imgs?`<div class="gallery v7-gallery">${imgs}</div>`:''}${row('Loại cơ sở',x.category)}${row('TDP / khu vực',x.wardBlock)}${row('Chủ cơ sở',x.ownerName)}${row('Số điện thoại',phoneLink(x.ownerPhone))}${row('Người quản lý',x.managerName)}${row('SĐT quản lý',phoneLink(x.managerPhone))}${row('Địa chỉ quản lý',x.managerAddress)}${row('Cán bộ phụ trách',x.officer)}${row('Quy mô',x.scale)}${row('Pháp lý',x.legal)}${v7ResidentBlock(x)}${row('Tọa độ',validGeo(x)?`${x.lat}, ${x.lng}`:'Chưa có')}<div class="actions mobile-actions"><a class="route-a" href="${escAttr(directionUrl(x))}" target="_blank" rel="noopener">🧭 Chỉ đường</a>${x.mapsUrl?`<a href="${escAttr(x.mapsUrl)}" target="_blank" rel="noopener">📍 Google Maps</a>`:''}<button class="secondary" onclick="sharePlace('${escJs(x.id)}')">↗️ Chia sẻ</button><button class="direct-edit admin-only" onclick="openEditor('${escJs(x.id)}')">✏️ Chỉnh sửa trực tiếp</button></div>`;
+ applyRoleUI();
+ if(innerWidth<=760)d.scrollIntoView({behavior:'smooth',block:'start'});
+}
+openListPlace=function(id){const x=places.find(p=>String(p.id)===String(id));if(!x)return toast('Không tìm thấy thông tin cơ sở.');selectedId=x.id;showDetail(x)}
+renderList=function(){
+ const base=filtered();const q=normSearch(listQuery||'');const arr=q?base.filter(x=>normSearch([x.name,x.category,x.wardBlock,x.ownerName,x.managerName,x.officer,x.ownerPhone,x.managerPhone,x.residentsText].join(' ')).includes(q)):base;const list=$('list');if(!list)return;
+ const search=`<div class="list-search"><span>🔎</span><input value="${escAttr(listQuery||'')}" placeholder="Tìm tên cơ sở, TDP, chủ cơ sở, cán bộ…" oninput="setListQuery(this.value)"><button type="button" onclick="setListQuery('')">×</button></div><div class="list-count">${arr.length} / ${base.length} cơ sở</div>`;
+ const rows=arr.length?arr.map(x=>`<article class="item v7-list-item ${selectedId===x.id?'selected':''}" data-id="${escAttr(x.id)}" tabindex="0" role="button" onclick="openListPlace('${escJs(x.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openListPlace('${escJs(x.id)}')}"><div class="item-head"><b>${esc(x.name||'Chưa đặt tên')}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.category||'Cơ sở')} · ${esc(x.wardBlock||'Chưa có TDP')}</small><small>👮 ${esc(x.officer||'Chưa phân công')}</small><div class="item-foot"><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span><span class="v7-open">Xem thông tin ›</span></div></article>`).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`;
+ list.innerHTML=search+rows;
+}
+// Delegated fallback makes list selection reliable on touch, mouse, Safari/Chrome/Firefox.
+document.addEventListener('pointerup',function(e){const item=e.target.closest?.('.v7-list-item');if(!item||e.target.closest('a,button,input,textarea,select'))return;openListPlace(item.dataset.id)},false);
+
+/* ===== V7.1 STABLE LIST + RESIDENT QUICK ACCESS ===== */
+function v71OpenResidentEditor(id){
+  const x=places.find(p=>String(p.id)===String(id));
+  if(!x)return toast('Không tìm thấy cơ sở.');
+  if(String(currentUser?.role||'').toLowerCase()!=='admin')return showDetail(x);
+  openEditor(x.id);
+  setTimeout(()=>document.getElementById('f_residentsText')?.scrollIntoView({behavior:'smooth',block:'center'}),120);
+}
+function v71ResidentCount(x){return v7ResidentLines(x).length}
+renderList=function(){
+ const base=filtered(),q=normSearch(listQuery||'');
+ const arr=q?base.filter(x=>normSearch([x.name,x.category,x.wardBlock,x.ownerName,x.managerName,x.officer,x.ownerPhone,x.managerPhone,x.residentsText,x.lodgerListUrl].join(' ')).includes(q)):base;
+ const list=$('list');if(!list)return;
+ const search=`<div class="list-search"><span>🔎</span><input value="${escAttr(listQuery||'')}" placeholder="Tìm cơ sở, TDP, chủ cơ sở, cán bộ, người cư trú…" oninput="setListQuery(this.value)"><button type="button" onclick="setListQuery('')">×</button></div><div class="list-count">${arr.length} / ${base.length} cơ sở</div>`;
+ const rows=arr.length?arr.map(x=>{const rc=v71ResidentCount(x),sheet=lodgerSheetUrl(x);return `<article class="item v7-list-item v71-list-item ${selectedId===x.id?'selected':''}" data-id="${escAttr(x.id)}" tabindex="0" role="button" aria-label="Xem thông tin ${escAttr(x.name||'cơ sở')}"><div class="item-head"><b>${esc(x.name||'Chưa đặt tên')}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.category||'Cơ sở')} · ${esc(x.wardBlock||'Chưa có TDP')}</small><small>👮 ${esc(x.officer||'Chưa phân công')}</small><div class="v71-resident-meta"><span>👥 ${rc?rc+' người/dòng':'Chưa nhập trực tiếp'}</span>${sheet?`<a href="${escAttr(sheet)}" target="_blank" rel="noopener noreferrer" data-no-open="1">📊 Google Sheet</a>`:''}</div><div class="item-foot"><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span><span class="v7-open">Xem thông tin ›</span></div></article>`}).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`;
+ list.innerHTML=search+rows;
+}
+// Replace V7 pointer fallback with a single deterministic delegated click path.
+document.addEventListener('click',function(e){
+ const item=e.target.closest?.('.v71-list-item');if(!item)return;
+ if(e.target.closest('[data-no-open="1"],button,input,textarea,select'))return;
+ openListPlace(item.dataset.id);
+},false);
+document.addEventListener('keydown',function(e){
+ const item=e.target.closest?.('.v71-list-item');if(!item||!(e.key==='Enter'||e.key===' '))return;
+ e.preventDefault();openListPlace(item.dataset.id);
+},false);
+const _v71ShowDetail=showDetail;
+showDetail=function(x){
+ _v71ShowDetail(x);
+ const d=$('detail');if(!d||!x)return;
+ const sec=d.querySelector('.v7-residents');if(sec&&String(currentUser?.role||'').toLowerCase()==='admin'){
+   const btn=document.createElement('button');btn.type='button';btn.className='v71-manage-residents';btn.textContent='✏️ Quản lý danh sách cư trú';btn.onclick=()=>v71OpenResidentEditor(x.id);sec.appendChild(btn);
+ }
+};
+
+
+/* ===== V7.2 STRUCTURED RESIDENT MANAGEMENT ===== */
+function v72ResidentArray(x){
+ const a=Array.isArray(x?.residents)?x.residents:[];
+ return a.filter(r=>r&&Object.values(r).some(v=>String(v??'').trim())).map(r=>({
+  name:String(r.name||'').trim(),birthYear:String(r.birthYear||'').trim(),cccd:String(r.cccd||'').trim(),phone:String(r.phone||'').trim(),
+  hometown:String(r.hometown||'').trim(),arrival:String(r.arrival||'').trim(),departure:String(r.departure||'').trim(),status:String(r.status||'Đang cư trú').trim()
+ }));
+}
+function v72ResidentRow(r={}){
+ return `<div class="v72-resident-row">
+  <label><span>Họ tên</span><input data-r="name" value="${escAttr(r.name||'')}" placeholder="Nguyễn Văn A"></label>
+  <label><span>Năm sinh</span><input data-r="birthYear" inputmode="numeric" value="${escAttr(r.birthYear||'')}" placeholder="2000"></label>
+  <label><span>CCCD</span><input data-r="cccd" inputmode="numeric" value="${escAttr(r.cccd||'')}" placeholder="Số CCCD"></label>
+  <label><span>SĐT</span><input data-r="phone" inputmode="tel" value="${escAttr(r.phone||'')}" placeholder="Số điện thoại"></label>
+  <label class="v72-wide"><span>Quê quán / địa chỉ</span><input data-r="hometown" value="${escAttr(r.hometown||'')}" placeholder="Quê quán hoặc địa chỉ thường trú"></label>
+  <label><span>Ngày đến</span><input data-r="arrival" type="date" value="${escAttr(r.arrival||'')}"></label>
+  <label><span>Ngày đi</span><input data-r="departure" type="date" value="${escAttr(r.departure||'')}"></label>
+  <label><span>Trạng thái</span><select data-r="status"><option ${r.status==='Đang cư trú'||!r.status?'selected':''}>Đang cư trú</option><option ${r.status==='Đã rời đi'?'selected':''}>Đã rời đi</option><option ${r.status==='Tạm vắng'?'selected':''}>Tạm vắng</option></select></label>
+  <button type="button" class="danger v72-remove" onclick="this.closest('.v72-resident-row').remove()">Xóa</button>
+ </div>`;
+}
+function v72RenderResidentEditor(arr=[]){const box=document.getElementById('v72ResidentRows');if(!box)return;box.innerHTML=v72ResidentArray({residents:arr}).map(v72ResidentRow).join('')||'<div class="v72-rm-empty">Chưa có người cư trú nhập theo bảng. Bấm “Thêm người”.</div>'}
+function v72AddResidentRow(){const box=document.getElementById('v72ResidentRows');if(!box)return;box.querySelector('.v72-rm-empty')?.remove();box.insertAdjacentHTML('beforeend',v72ResidentRow({}));box.lastElementChild?.querySelector('input')?.focus()}
+function v72CollectResidents(){return [...document.querySelectorAll('#v72ResidentRows .v72-resident-row')].map(row=>{const o={};row.querySelectorAll('[data-r]').forEach(el=>o[el.dataset.r]=el.value.trim());return o}).filter(r=>Object.values(r).some(Boolean))}
+function v72AllResidentSearch(x){return [...v72ResidentArray(x).flatMap(r=>Object.values(r)),x?.residentsText||''].join(' ')}
+function v72StructuredResidentBlock(x){const a=v72ResidentArray(x);if(!a.length)return '';return `<div class="v72-resident-table-wrap"><table class="v72-resident-table"><thead><tr><th>Họ tên</th><th>Năm sinh</th><th>CCCD</th><th>SĐT</th><th>Quê quán</th><th>Ngày đến</th><th>Trạng thái</th></tr></thead><tbody>${a.map(r=>`<tr><td><b>${esc(r.name||'—')}</b></td><td>${esc(r.birthYear||'—')}</td><td>${esc(r.cccd||'—')}</td><td>${r.phone?phoneLink(r.phone):'—'}</td><td>${esc(r.hometown||'—')}</td><td>${esc(r.arrival||'—')}</td><td><span class="v72-status">${esc(r.status||'Đang cư trú')}</span></td></tr>`).join('')}</tbody></table></div>`}
+const _v72ResidentBlock=v7ResidentBlock;
+v7ResidentBlock=function(x){const structured=v72StructuredResidentBlock(x),legacy=_v72ResidentBlock(x);return legacy.replace('<section class="v7-residents">','<section class="v7-residents">'+structured)};
+const _v72RenderList=renderList;
+renderList=function(){
+ const base=filtered(),q=normSearch(listQuery||'');
+ const arr=q?base.filter(x=>normSearch([x.name,x.category,x.wardBlock,x.ownerName,x.managerName,x.officer,x.ownerPhone,x.managerPhone,x.lodgerListUrl,v72AllResidentSearch(x)].join(' ')).includes(q)):base;
+ const list=$('list');if(!list)return;
+ const search=`<div class="list-search"><span>🔎</span><input value="${escAttr(listQuery||'')}" placeholder="Tìm cơ sở hoặc người cư trú…" oninput="setListQuery(this.value)"><button type="button" onclick="setListQuery('')">×</button></div><div class="list-count">${arr.length} / ${base.length} cơ sở</div>`;
+ const rows=arr.length?arr.map(x=>{const structured=v72ResidentArray(x),rc=structured.length||v71ResidentCount(x),sheet=lodgerSheetUrl(x);return `<article class="item v7-list-item v71-list-item ${selectedId===x.id?'selected':''}" data-id="${escAttr(x.id)}" tabindex="0" role="button"><div class="item-head"><b>${esc(x.name||'Chưa đặt tên')}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.category||'Cơ sở')} · ${esc(x.wardBlock||'Chưa có TDP')}</small><small>👮 ${esc(x.officer||'Chưa phân công')}</small><div class="v71-resident-meta"><span>👥 ${rc?rc+' người/dòng':'Chưa có dữ liệu cư trú'}</span>${sheet?`<a href="${escAttr(sheet)}" target="_blank" rel="noopener noreferrer" data-no-open="1">📊 Google Sheet</a>`:''}</div><div class="item-foot"><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span><span class="v7-open">Xem thông tin ›</span></div></article>`}).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`;
+ list.innerHTML=search+rows;
+};
+
+
+/* ===== V7.3 RESIDENT SEARCH / FILTER / EXPORT + STABILITY ===== */
+let v73ResidentFilter='all';
+function v73ResidentStats(x){
+ const a=v72ResidentArray(x);return {total:a.length,active:a.filter(r=>r.status==='Đang cư trú'||!r.status).length,away:a.filter(r=>r.status==='Tạm vắng').length,left:a.filter(r=>r.status==='Đã rời đi').length};
+}
+function v73SetResidentFilter(v){v73ResidentFilter=v||'all';renderList()}
+function v73CsvCell(v){v=String(v??'');return '"'+v.replace(/"/g,'""')+'"'}
+function v73ExportResidents(id){
+ const x=places.find(p=>String(p.id)===String(id));if(!x)return toast('Không tìm thấy cơ sở.');
+ const a=v72ResidentArray(x);if(!a.length)return toast('Cơ sở chưa có danh sách cư trú dạng bảng.');
+ const head=['Họ tên','Năm sinh','CCCD','SĐT','Quê quán / địa chỉ','Ngày đến','Ngày đi','Trạng thái'];
+ const lines=[head,...a.map(r=>[r.name,r.birthYear,r.cccd,r.phone,r.hometown,r.arrival,r.departure,r.status])].map(row=>row.map(v73CsvCell).join(',')).join('\r\n');
+ const blob=new Blob(['\ufeff'+lines],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),ael=document.createElement('a');
+ ael.href=url;ael.download=('nguoi-cu-tru-'+String(x.name||'co-so').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'')+'.csv').toLowerCase();
+ document.body.appendChild(ael);ael.click();ael.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Đã xuất danh sách người cư trú.');
+}
+function v73ResidentSummary(x){const s=v73ResidentStats(x);if(!s.total)return '';return `<div class="v73-summary"><span>👥 ${s.total} tổng</span><span>🟢 ${s.active} đang cư trú</span><span>🟡 ${s.away} tạm vắng</span><span>⚪ ${s.left} đã rời đi</span></div>`}
+const _v73ShowDetail=showDetail;
+showDetail=function(x){
+ _v73ShowDetail(x);const d=$('detail');if(!d||!x)return;const sec=d.querySelector('.v7-residents');if(!sec)return;
+ const sum=document.createElement('div');sum.innerHTML=v73ResidentSummary(x);if(sum.firstElementChild)sec.insertBefore(sum.firstElementChild,sec.firstChild);
+ if(v72ResidentArray(x).length){const b=document.createElement('button');b.type='button';b.className='secondary v73-export';b.textContent='⬇️ Xuất danh sách CSV';b.onclick=()=>v73ExportResidents(x.id);sec.appendChild(b)}
+};
+renderList=function(){
+ const base=filtered(),q=normSearch(listQuery||'');let arr=q?base.filter(x=>normSearch([x.name,x.category,x.wardBlock,x.ownerName,x.managerName,x.officer,x.ownerPhone,x.managerPhone,x.lodgerListUrl,v72AllResidentSearch(x)].join(' ')).includes(q)):base;
+ if(v73ResidentFilter!=='all')arr=arr.filter(x=>{const s=v73ResidentStats(x);if(v73ResidentFilter==='active')return s.active>0;if(v73ResidentFilter==='sheet')return !!lodgerSheetUrl(x);if(v73ResidentFilter==='none')return !s.total&&!v7ResidentLines(x).length&&!lodgerSheetUrl(x);return true});
+ const list=$('list');if(!list)return;
+ const filters=`<div class="v73-filters"><button class="${v73ResidentFilter==='all'?'active':''}" onclick="v73SetResidentFilter('all')">Tất cả</button><button class="${v73ResidentFilter==='active'?'active':''}" onclick="v73SetResidentFilter('active')">Đang cư trú</button><button class="${v73ResidentFilter==='sheet'?'active':''}" onclick="v73SetResidentFilter('sheet')">Có Google Sheet</button><button class="${v73ResidentFilter==='none'?'active':''}" onclick="v73SetResidentFilter('none')">Chưa có DS</button></div>`;
+ const search=`<div class="list-search"><span>🔎</span><input value="${escAttr(listQuery||'')}" placeholder="Tìm cơ sở hoặc người cư trú…" oninput="setListQuery(this.value)"><button type="button" onclick="setListQuery('')">×</button></div>${filters}<div class="list-count">${arr.length} / ${base.length} cơ sở</div>`;
+ const rows=arr.length?arr.map(x=>{const structured=v72ResidentArray(x),rc=structured.length||v71ResidentCount(x),sheet=lodgerSheetUrl(x),st=v73ResidentStats(x);return `<article class="item v7-list-item v71-list-item ${selectedId===x.id?'selected':''}" data-id="${escAttr(x.id)}" tabindex="0" role="button"><div class="item-head"><b>${esc(x.name||'Chưa đặt tên')}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.category||'Cơ sở')} · ${esc(x.wardBlock||'Chưa có TDP')}</small><small>👮 ${esc(x.officer||'Chưa phân công')}</small><div class="v71-resident-meta"><span>👥 ${rc?rc+' người/dòng':'Chưa có dữ liệu cư trú'}</span>${st.active?`<span class="v73-active-count">🟢 ${st.active} đang ở</span>`:''}${sheet?`<a href="${escAttr(sheet)}" target="_blank" rel="noopener noreferrer" data-no-open="1">📊 Google Sheet</a>`:''}</div><div class="item-foot"><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span><span class="v7-open">Xem thông tin ›</span></div></article>`}).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`;
+ list.innerHTML=search+rows;
+};

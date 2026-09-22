@@ -2,18 +2,20 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
-<meta name="theme-color" content="#0b5fa5"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Thủy Nguyên Map"><meta name="format-detection" content="telephone=yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#9b0d16"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Thủy Nguyên Map"><meta name="format-detection" content="telephone=yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>Bản đồ số Thủy Nguyên</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png"><link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="style.css?v=6.9.1">
+<link rel="stylesheet" href="style.css?v=7.4.0">
 </head>
 <body>
 <div id="login" class="screen">
-  <div class="login-card">
-    <img class="app-icon" src="icons/icon-192.png" alt=""><h1>Bản đồ số</h1><p>Thủy Nguyên · Mobile V6.9.1</p>
+  <div class="login-card police-login-card">
+    <div class="police-emblem-wrap"><img class="police-emblem" src="icons/cong-an-hai-phong.png" alt="Biểu trưng Công an"></div>
+    <div class="police-kicker">CÔNG AN THÀNH PHỐ HẢI PHÒNG</div>
+    <h1>BẢN ĐỒ SỐ</h1><p class="police-subtitle">CÔNG AN PHƯỜNG THỦY NGUYÊN</p><div class="police-divider"></div><p class="login-desc">Quản lý cơ sở lưu trú và người cư trú</p>
     <input id="user" placeholder="Email / tài khoản" value="admin" autocomplete="username">
     <input id="pass" placeholder="Mật khẩu" type="password" value="admin123" autocomplete="current-password">
     <button onclick="login()">Đăng nhập</button>
@@ -22,14 +24,14 @@
 </div>
 <div id="app" class="hidden">
   <header>
-    <div class="brand"><img src="icons/icon-192.png" alt=""><b>Bản đồ số Thủy Nguyên</b><span class="version">V6.9.1</span></div>
+    <div class="brand police-brand"><img src="icons/cong-an-hai-phong.png" alt=""><div><small>CÔNG AN TP HẢI PHÒNG</small><b>Bản đồ số · CAP Thủy Nguyên</b></div><span class="version">V7.4.0</span></div>
     <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
   </header>
   <div class="toolbar">
     <select id="searchField" onchange="renderAll()"><option value="all">Tất cả trường</option><option value="name">Tên cơ sở</option><option value="category">Loại cơ sở</option><option value="wardBlock">Tổ dân phố</option><option value="officer">Cán bộ phụ trách</option><option value="ownerName">Chủ cơ sở</option><option value="ownerPhone">SĐT chủ cơ sở</option><option value="managerName">Người quản lý</option><option value="managerPhone">SĐT quản lý</option><option value="managerAddress">Địa chỉ quản lý</option><option value="scale">Quy mô</option><option value="legal">Pháp lý</option><option value="status">Tình trạng</option></select><input id="search" placeholder="🔎 Nhập nội dung cần tìm..." oninput="renderAll()">
     <select id="statusFilter" onchange="renderAll()"><option value="">Tất cả trạng thái</option><option value="active">Đang hoạt động</option><option value="inactive">Không hoạt động</option></select>
-    <button class="overview-btn" onclick="openOverview()">◉ Tổng quan</button><button class="primary admin-only" onclick="openAddSafely(event)">＋ Thêm</button>
-    <button onclick="locateMe()" title="Vị trí của tôi">◎</button>
+    <button class="overview-btn" onclick="openOverview()">▦ Tổng quan</button><button class="primary admin-only" onclick="openAddSafely(event)">＋ Thêm cơ sở</button>
+    <button onclick="locateMe()" title="Vị trí của tôi">⌖</button>
     <button onclick="fitAll()" title="Hiện toàn bộ điểm">⌖</button><button id="layerBtn" onclick="openMapLayers()" title="Chọn kiểu bản đồ">▱</button>
     <button class="admin-only" onclick="openDataMenu()" title="Nhập / xuất dữ liệu">⇅</button>
   </div>
@@ -53,6 +55,6 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="config.js?v=6.9.1"></script>
-<script src="data.js?v=6.9.1"></script><script src="app.js?v=6.9.1"></script>
+<script src="config.js?v=7.4.0"></script>
+<script src="data.js?v=7.4.0"></script><script src="app.js?v=7.4.0"></script>
 </body></html>
