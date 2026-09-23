@@ -573,3 +573,61 @@ renderList=function(){
  const rows=arr.length?arr.map(x=>{const structured=v72ResidentArray(x),rc=structured.length||v71ResidentCount(x),sheet=lodgerSheetUrl(x),st=v73ResidentStats(x);return `<article class="item v7-list-item v71-list-item ${selectedId===x.id?'selected':''}" data-id="${escAttr(x.id)}" tabindex="0" role="button"><div class="item-head"><b>${esc(x.name||'Chưa đặt tên')}</b><span class="dot ${isActive(x.status)?'on':'off'}"></span></div><small>${esc(x.category||'Cơ sở')} · ${esc(x.wardBlock||'Chưa có TDP')}</small><small>👮 ${esc(x.officer||'Chưa phân công')}</small><div class="v71-resident-meta"><span>👥 ${rc?rc+' người/dòng':'Chưa có dữ liệu cư trú'}</span>${st.active?`<span class="v73-active-count">🟢 ${st.active} đang ở</span>`:''}${sheet?`<a href="${escAttr(sheet)}" target="_blank" rel="noopener noreferrer" data-no-open="1">📊 Google Sheet</a>`:''}</div><div class="item-foot"><span class="badge ${isActive(x.status)?'':'off'}">${esc(x.status||'Chưa rõ')}</span><span class="v7-open">Xem thông tin ›</span></div></article>`}).join(''):`<div class="empty">Không có kết quả phù hợp.</div>`;
  list.innerHTML=search+rows;
 };
+
+
+/* ===== V7.5 SMART UX / MOBILE / DETAIL RELIABILITY ===== */
+function v75ImageSrc(src=''){
+ const v=String(src||'').trim();
+ if(/^https?:\/\//i.test(v)||/^data:image\//i.test(v)||/^blob:/i.test(v))return v;
+ return '';
+}
+v7SafeImages=function(x){return (Array.isArray(x?.images)?x.images:[]).map(v75ImageSrc).filter(Boolean).slice(0,8).map(src=>`<div class="v7-imgwrap"><img src="${escAttr(src)}" alt="Ảnh cơ sở" loading="lazy" decoding="async" onerror="this.closest('.v7-imgwrap')?.classList.add('img-error')"></div>`).join('')}
+
+function v75OpenSelectedEditor(){
+ const x=places.find(p=>String(p.id)===String(selectedId));
+ if(!x)return toast('Hãy chọn một cơ sở trước.');
+ openEditor(x.id);
+}
+function v75CopyCoords(id){
+ const x=places.find(p=>String(p.id)===String(id));if(!x||!validGeo(x))return toast('Cơ sở chưa có tọa độ.');
+ const text=`${x.lat}, ${x.lng}`;
+ if(navigator.clipboard?.writeText)navigator.clipboard.writeText(text).then(()=>toast('Đã sao chép tọa độ.')).catch(()=>prompt('Sao chép tọa độ:',text));else prompt('Sao chép tọa độ:',text);
+}
+function v75FocusSelected(id){
+ const x=places.find(p=>String(p.id)===String(id));if(!x)return;
+ if(validGeo(x)){map.flyTo([x.lat,x.lng],18,{duration:.65});setTimeout(()=>map.invalidateSize(),80)}
+ else toast('Cơ sở này chưa có tọa độ.');
+}
+const _v75ShowDetail=showDetail;
+showDetail=function(x){
+ _v75ShowDetail(x);const d=$('detail');if(!d||!x)return;
+ const title=d.querySelector('.detail-title');
+ if(title){const tools=document.createElement('div');tools.className='v75-detail-tools';tools.innerHTML=`<button type="button" onclick="v75FocusSelected('${escJs(x.id)}')">◎ Xem trên bản đồ</button>${validGeo(x)?`<button type="button" onclick="v75CopyCoords('${escJs(x.id)}')">⧉ Sao chép tọa độ</button>`:''}${String(currentUser?.role||'').toLowerCase()==='admin'?`<button type="button" class="v75-edit" onclick="openEditor('${escJs(x.id)}')">✎ Sửa thông tin</button>`:''}`;title.after(tools)}
+ if(innerWidth<=760){document.body.dataset.mobiletab='list';requestAnimationFrame(()=>d.scrollTop=0)}
+}
+
+function v75OpenFromList(id){
+ const x=places.find(p=>String(p.id)===String(id));if(!x)return toast('Không tìm thấy thông tin cơ sở.');
+ selectedId=x.id;showDetail(x);
+}
+// Capture click once, before legacy delegated handlers, so touch/mouse behavior is deterministic.
+document.addEventListener('click',function(e){
+ const item=e.target.closest?.('.v71-list-item');if(!item)return;
+ if(e.target.closest('a,button,input,textarea,select,[data-no-open="1"]'))return;
+ e.preventDefault();e.stopImmediatePropagation();v75OpenFromList(item.dataset.id);
+},true);
+
+function v75EnhanceEditor(){
+ const form=document.getElementById('placeForm');if(!form||form.dataset.v75)return;form.dataset.v75='1';
+ const name=document.getElementById('f_name'),cat=document.getElementById('f_category');
+ if(name&&cat){name.addEventListener('input',()=>{if(!cat.dataset.touched)cat.value=inferCategory(name.value)});cat.addEventListener('input',()=>cat.dataset.touched='1')}
+ const mapUrl=document.getElementById('f_mapsUrl');if(mapUrl){mapUrl.addEventListener('paste',()=>setTimeout(()=>{const c=parseCoords(mapUrl.value);if(c){$('f_lat').value=c[0];$('f_lng').value=c[1];toast('Đã tự nhận tọa độ từ link Google Maps.')}},30))}
+}
+const _v75OpenEditor=openEditor;
+openEditor=function(id=null){_v75OpenEditor(id);setTimeout(v75EnhanceEditor,0)};
+
+// Keep Leaflet correct after mobile tab/modal/orientation changes.
+function v75RefreshMap(){try{map?.invalidateSize({pan:false})}catch(e){}}
+window.addEventListener('pageshow',()=>setTimeout(v75RefreshMap,100));
+window.addEventListener('orientationchange',()=>setTimeout(v75RefreshMap,350));
+if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>setTimeout(v75RefreshMap,90))}
