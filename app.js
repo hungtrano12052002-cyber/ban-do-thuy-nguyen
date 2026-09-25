@@ -961,3 +961,60 @@ enterApp=function(){
     if(map){map.invalidateSize();const pts=filtered().filter(validGeo).map(x=>[Number(x.lat),Number(x.lng)]);if(pts.length)map.fitBounds(pts,{padding:[35,35],maxZoom:16});}
   },450);
 };
+
+/* ===== V7.6.3 GPS SYNC INDEPENDENT OF LOGIN MODE ===== */
+let v763GpsRunning=false,v763GpsStop=false,v763GpsFailures=[];
+function v763ResolverAvailable(){return !!(supabaseClient&&cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY)}
+function v763GpsRows(){return places.filter(x=>!validGeo(x)&&String(x.mapsUrl||'').trim())}
+async function v763ResolveOne(x){
+ const direct=parseCoords(String(x.mapsUrl||''));
+ if(direct&&Number.isFinite(direct[0])&&Number.isFinite(direct[1])) return {lat:direct[0],lng:direct[1],finalUrl:x.mapsUrl,source:'url'};
+ if(!v763ResolverAvailable()) throw new Error('Chưa kết nối bộ phân giải Google Maps');
+ const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:x.mapsUrl}});
+ if(error)throw error;
+ if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ');
+ return {lat:Number(data.lat),lng:Number(data.lng),finalUrl:data.finalUrl||x.mapsUrl,source:'resolve-map-link'};
+}
+async function v763StoreGps(x,r){
+ x.lat=Number(r.lat);x.lng=Number(r.lng);x.coordinateSource=r.source||'google-map-link';x.coordinateUpdatedAt=new Date().toISOString();
+ if(r.finalUrl)x.resolvedMapsUrl=r.finalUrl;
+ // Always persist locally so LOCAL ADMIN immediately gets markers.
+ persist();
+ // Cloud save is best-effort only when an authenticated cloud user exists.
+ if(currentUser?.cloud&&supabaseClient){
+   try{await supabaseClient.from('places').upsert({id:String(x.id),data:x,updated_at:new Date().toISOString(),updated_by:currentUser.id})}catch(_e){}
+ }
+}
+function v763RefreshMap(){renderAll();v758GeoStatus();if(map){map.invalidateSize();const pts=filtered().filter(validGeo).map(x=>[Number(x.lat),Number(x.lng)]);if(pts.length)map.fitBounds(pts,{padding:[40,40],maxZoom:17});}}
+async function v763SyncGps(){
+ if(v763GpsRunning)return;if(currentUser?.role!=='admin')return toast('Chỉ ADMIN được đồng bộ vị trí.');
+ const todo=v763GpsRows();if(!todo.length)return toast('Tất cả cơ sở có Google Maps đã có vị trí.');
+ if(!v763ResolverAvailable()&&!todo.some(x=>parseCoords(String(x.mapsUrl||''))))return toast('Chưa kết nối Supabase/resolve-map-link. Kiểm tra config.js.');
+ v763GpsRunning=true;v763GpsStop=false;v763GpsFailures=[];let ok=0;
+ const log=$('v67Log');if(log)log.innerHTML='';v67SetProgress(0,todo.length,'Đang đồng bộ');
+ for(let i=0;i<todo.length;i++){
+   if(v763GpsStop)break;const x=todo[i];
+   try{const r=await v763ResolveOne(x);await v763StoreGps(x,r);ok++;v67Log(`${x.name} → ${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}`)}
+   catch(e){v763GpsFailures.push({id:x.id,name:x.name,error:e?.message||String(e)});v67Log(`${x.name}: ${e?.message||e}`,false)}
+   v67SetProgress(i+1,todo.length,`Thành công ${ok} · Chưa được ${v763GpsFailures.length}`);
+   if((i+1)%10===0)v763RefreshMap();
+   await new Promise(r=>setTimeout(r,220));
+ }
+ v763GpsRunning=false;v763RefreshMap();
+ const s=v761GpsSummary();toast(`Đồng bộ xong: ${s.geo}/${s.total} cơ sở có vị trí.`);v763OpenGps();
+}
+async function v763RetryFailed(){
+ if(!v763GpsFailures.length)return toast('Không có điểm lỗi để thử lại.');
+ const ids=new Set(v763GpsFailures.map(x=>String(x.id)));v763GpsFailures=[];
+ const all=places.filter(x=>ids.has(String(x.id))&&!validGeo(x));if(!all.length)return toast('Các điểm lỗi đã có vị trí.');
+ // Reuse full sync after narrowing by temporarily prioritising failed records.
+ const old=places;places=[...all,...old.filter(x=>!ids.has(String(x.id)))];try{await v763SyncGps()}finally{places=old;v763RefreshMap()}
+}
+function v763OpenGps(){
+ if(currentUser?.role!=='admin')return toast('Chỉ ADMIN được cập nhật vị trí cơ sở.');
+ v761DirectGpsRecovery();const s=v761GpsSummary(),ready=v763ResolverAvailable();
+ const fails=v763GpsFailures.slice(0,12).map(x=>`<div class="bad">! ${esc(x.name)} · ${esc(x.error)}</div>`).join('');
+ $('modalCard').innerHTML=`<div class="modal-head"><h2>📍 Đồng bộ vị trí Google Maps</h2><button onclick="closeModal()">×</button></div><div class="v67-kpis"><div><b>${s.total}</b><span>Tổng cơ sở</span></div><div><b>${s.geo}</b><span>Đã có vị trí</span></div><div><b>${s.missing}</b><span>Chưa có vị trí</span></div></div><div class="v67-info"><b>Nguồn dữ liệu:</b> ${currentUser?.cloud?'Cloud':'Thiết bị này'} · <b>Quyền:</b> ADMIN. ${ready?'Bộ phân giải Google Maps đã sẵn sàng. Có thể xử lý cả link rút gọn.':'Chưa kết nối bộ phân giải. Kiểm tra config.js và Edge Function resolve-map-link.'}</div><div id="v67Progress" class="v67-progress"><div><i style="width:${s.total?Math.round(s.geo/s.total*100):0}%"></i></div><span>${s.geo}/${s.total} cơ sở đã định vị</span></div><div class="geo-actions"><button class="primary" onclick="v763SyncGps()" ${v763GpsRunning?'disabled':''}>📌 Đồng bộ ${s.links} vị trí còn thiếu</button><button onclick="v763GpsStop=true">Dừng</button><button onclick="openGeoManager()">🧭 Định vị thủ công</button></div><div id="v67Log" class="v67-log">${fails}</div>${v763GpsFailures.length?`<button onclick="v763RetryFailed()">↻ Thử lại ${v763GpsFailures.length} điểm lỗi</button>`:''}<p class="v67-note">Tọa độ được lưu ngay trên thiết bị để marker xuất hiện tức thì. Khi đăng nhập Cloud, dữ liệu cũng được đồng bộ lên Supabase.</p>`;
+ $('modal').classList.remove('hidden');
+}
+openAutoGps=v763OpenGps;v67OpenResolver=v763OpenGps;
