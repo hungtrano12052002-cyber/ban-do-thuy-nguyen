@@ -918,3 +918,46 @@ function v761OpenGpsRecovery(){
 }
 openAutoGps=v761OpenGpsRecovery;
 const _v761Enter=enterApp;enterApp=function(){_v761Enter();setTimeout(()=>{const n=v761DirectGpsRecovery();const s=v761GpsSummary();if(map){map.invalidateSize();const pts=filtered().filter(validGeo).map(x=>[Number(x.lat),Number(x.lng)]);if(pts.length)map.fitBounds(pts,{padding:[35,35],maxZoom:16});}if(currentUser?.role==='admin'&&s.geo===0&&s.links>0){toast(currentUser?.cloud?'187 cơ sở chưa có GPS. Vào Bản đồ → Cập nhật GPS để khôi phục vị trí.':'Đang LOCAL: cần đăng nhập email ADMIN Cloud để tự lấy GPS từ link Google Maps.');}},350)};
+
+/* ===== V7.6.2 FINAL AUTH CHAIN FIX =====
+   Root cause: the legacy V7.5.9 enter wrapper still called v759CloudProfile()
+   after V7.6.0 had already verified ADMIN, and could downgrade the account
+   back to USER when new profile columns/RLS were unavailable. */
+v759CloudProfile=async function(uid){
+  const a=await v760CloudAccess(uid);
+  if(!a?.ok) return {role:null,tdp_access:[],can_edit:false,__unverified:true};
+  return {role:a.role,tdp_access:a.role==='admin'?['*']:(a.tdp_access||[]),can_edit:a.role==='admin'||!!a.can_edit,__verified:true};
+};
+
+// Harden scope logic: a verified ADMIN always bypasses TDP filtering.
+v755AllowedTdp=function(x){
+  if(String(currentUser?.role||'').toLowerCase()==='admin' && currentUser?.accessVerified!==false) return true;
+  const scopes=Array.isArray(currentUser?.tdpAccess)?currentUser.tdpAccess:[];
+  if(scopes.includes('*')) return true;
+  if(!scopes.length)return false;
+  const w=v755NormTdp(x?.wardBlock);
+  return scopes.some(s=>v755NormTdp(s)===w);
+};
+
+// Never let the legacy wrapper overwrite a verified authority with an unreadable profile.
+const _v762Enter=enterApp;
+enterApp=function(){
+  const before=currentUser?{role:currentUser.role,tdpAccess:[...(currentUser.tdpAccess||[])],canEdit:currentUser.canEdit,accessVerified:currentUser.accessVerified}:null;
+  _v762Enter();
+  setTimeout(async()=>{
+    if(currentUser?.cloud&&currentUser?.id){
+      const a=await v760CloudAccess(currentUser.id);
+      if(a?.ok){
+        v760ApplyAccess(a);
+      }else if(before?.accessVerified && before.role==='admin'){
+        currentUser.role='admin';currentUser.tdpAccess=['*'];currentUser.canEdit=true;currentUser.accessVerified=true;
+      }
+    }
+    const r=$('role');
+    if(r)r.textContent=v755IsSuper()?'ADMIN · TOÀN PHƯỜNG':`USER · ${currentUser?.tdpAccess?.length||0} TDP`;
+    document.body.dataset.role=currentUser?.role||'';
+    await loadCurrentMode();
+    renderAll();v755ScopeBanner();v758GeoStatus();
+    if(map){map.invalidateSize();const pts=filtered().filter(validGeo).map(x=>[Number(x.lat),Number(x.lng)]);if(pts.length)map.fitBounds(pts,{padding:[35,35],maxZoom:16});}
+  },450);
+};
