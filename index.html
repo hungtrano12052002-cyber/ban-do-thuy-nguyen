@@ -8,14 +8,14 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="style.css?v=7.5.1">
+<link rel="stylesheet" href="style.css?v=7.5.7">
 </head>
 <body>
-<div id="login" class="screen">
+<div id="login" class="screen vietnam-login">
   <div class="login-card police-login-card">
     <div class="police-emblem-wrap"><img class="police-emblem" src="icons/cong-an-hai-phong.png" alt="Biểu trưng Công an"></div>
     <div class="police-kicker">CÔNG AN THÀNH PHỐ HẢI PHÒNG</div>
-    <h1>BẢN ĐỒ SỐ</h1><p class="police-subtitle">CÔNG AN PHƯỜNG THỦY NGUYÊN</p><div class="police-divider"></div><p class="login-desc">Quản lý cơ sở lưu trú và người cư trú</p>
+    <h1>BẢN ĐỒ SỐ</h1><p class="police-subtitle">CÔNG AN PHƯỜNG THỦY NGUYÊN</p><div class="police-divider"></div><p class="login-desc">Quản lý cơ sở lưu trú và người cư trú</p><p class="vn-motto">Vì an ninh Tổ quốc · Vì hạnh phúc Nhân dân</p>
     <input id="user" placeholder="Email / tài khoản" value="admin" autocomplete="username">
     <input id="pass" placeholder="Mật khẩu" type="password" value="admin123" autocomplete="current-password">
     <button onclick="login()">Đăng nhập</button>
@@ -23,8 +23,20 @@
   </div>
 </div>
 <div id="app" class="hidden">
+  <aside class="cc-nav">
+    <div class="cc-nav-brand"><img src="icons/cong-an-hai-phong.png"><div><b>CÔNG AN TP HẢI PHÒNG<br>CÔNG AN PHƯỜNG THỦY NGUYÊN</b><small>BẢN ĐỒ SỐ QUẢN LÝ LƯU TRÚ</small></div></div>
+    <button class="active" onclick="v753ShowDashboard()"><span class="ico">⌂</span>Tổng quan</button>
+    <button onclick="v753ShowMap()"><span class="ico">🗺</span>Bản đồ</button>
+    <button onclick="v753ShowList()"><span class="ico">▤</span>Danh sách cơ sở</button>
+    <button onclick="v753OpenResidents()"><span class="ico">♟</span>Người cư trú</button>
+    <button class="admin-only" onclick="openAddSafely(event)"><span class="ico">⊕</span>Thêm mới</button>
+    <button onclick="openOverview()"><span class="ico">▥</span>Thống kê - Báo cáo</button>
+    <button class="admin-only" onclick="openDataMenu()"><span class="ico">⇅</span>Công cụ dữ liệu</button>
+    <button class="admin-only" onclick="v755OpenAccounts()"><span class="ico">👥</span>Tài khoản & phân quyền</button>
+    <div class="cc-motto">Vì bình yên Thủy Nguyên</div>
+  </aside>
   <header>
-    <div class="brand police-brand"><img src="icons/cong-an-hai-phong.png" alt=""><div><small>CÔNG AN TP HẢI PHÒNG</small><b>Bản đồ số · CAP Thủy Nguyên</b></div><span class="version">V7.5.0</span></div>
+    <div class="brand police-brand"><img src="icons/cong-an-hai-phong.png" alt=""><div><small>CÔNG AN TP HẢI PHÒNG</small><b>Bản đồ số · CAP Thủy Nguyên</b></div><span class="version">V7.5.7</span></div>
     <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
   </header>
   <div class="toolbar">
@@ -35,7 +47,9 @@
     <button onclick="fitAll()" title="Hiện toàn bộ điểm">⌖</button><button id="layerBtn" onclick="openMapLayers()" title="Chọn kiểu bản đồ">▱</button>
     <button class="admin-only" onclick="openDataMenu()" title="Nhập / xuất dữ liệu">⇅</button>
   </div>
-  <main>
+  <div id="ccKpis" class="cc-kpis"></div>
+  <aside class="cc-right"><h3>⚠ CẢNH BÁO & NHẮC NHỞ</h3><div id="ccAlerts"></div><div class="cc-section"><h3>HOẠT ĐỘNG HỆ THỐNG</h3><div class="cc-alert"><b>Trạng thái dữ liệu</b><span id="ccDataState">Đang kiểm tra…</span></div><div class="cc-alert"><b>Gợi ý</b>Chọn một cơ sở trong danh sách để xem chi tiết và chỉnh sửa.</div></div></aside>
+  <main><section id="smartDashboard" class="smart-dashboard hidden"></section>
     <aside id="sidebar"><div id="stats" class="stats"></div><div id="list"></div></aside>
     <section id="map"></section>
     <div class="v66-map-search"><span>⌕</span><input id="mapQuickSearch" placeholder="Tìm cơ sở, TDP, cán bộ…" oninput="v66QuickSearch(this.value)"><button onclick="v66ClearSearch()">×</button></div>
@@ -55,6 +69,6 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="config.js?v=7.5.1"></script>
-<script src="data.js?v=7.5.1"></script><script src="app.js?v=7.5.1"></script>
+<script src="config.js?v=7.5.7"></script>
+<script src="data.js?v=7.5.7"></script><script src="app.js?v=7.5.7"></script>
 </body></html>
