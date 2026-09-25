@@ -898,3 +898,23 @@ const _v760Enter=enterApp;enterApp=function(){
    setTimeout(()=>{const r=$('role');if(r)r.textContent=v755IsSuper()?'ADMIN · TOÀN PHƯỜNG':`USER · ${currentUser?.tdpAccess?.length||0} TDP`;v755ScopeBanner();renderAll();},160);
  }; go();
 };
+
+/* ===== V7.6.1 GPS RECOVERY ===== */
+function v761DirectGpsRecovery(){
+ let n=0;
+ places.forEach(x=>{if(validGeo(x)||!x.mapsUrl)return;const c=parseCoords(String(x.mapsUrl));if(c&&Number.isFinite(c[0])&&Number.isFinite(c[1])){x.lat=c[0];x.lng=c[1];x.coordinateSource='url';n++}});
+ if(n){persist();renderAll();}
+ return n;
+}
+function v761GpsSummary(){
+ const total=filtered().length,geo=filtered().filter(validGeo).length,links=filtered().filter(x=>!validGeo(x)&&String(x.mapsUrl||'').trim()).length;
+ return {total,geo,missing:total-geo,links};
+}
+function v761OpenGpsRecovery(){
+ if(currentUser?.role!=='admin')return toast('Chỉ ADMIN được cập nhật vị trí cơ sở.');
+ const direct=v761DirectGpsRecovery(),s=v761GpsSummary(),cloud=!!(currentUser?.cloud&&supabaseClient);
+ $('modalCard').innerHTML=`<div class="modal-head"><h2>📍 Khôi phục vị trí cơ sở</h2><button onclick="closeModal()">×</button></div><div class="v67-kpis"><div><b>${s.total}</b><span>Tổng cơ sở</span></div><div><b>${s.geo}</b><span>Đã có vị trí</span></div><div><b>${s.missing}</b><span>Chưa có vị trí</span></div></div>${direct?`<div class="v761-ok">✓ Vừa khôi phục ${direct} tọa độ từ URL đầy đủ.</div>`:''}<div class="v67-info">${cloud?`Đang đăng nhập <b>Cloud ADMIN</b>. Có thể giải các liên kết Google Maps rút gọn bằng Edge Function <code>resolve-map-link</code>.`:`Bạn đang ở chế độ <b>LOCAL</b>. ${s.links} cơ sở có link Google Maps nhưng trình duyệt không thể tự mở link rút gọn để lấy GPS do giới hạn bảo mật. Hãy đăng xuất và đăng nhập bằng <b>email ADMIN Supabase</b>, sau đó quay lại đây.`}</div><div id="v67Progress" class="v67-progress"><div><i style="width:0%"></i></div><span>Sẵn sàng</span></div><div id="v67Log" class="v67-log"></div><div class="geo-actions">${cloud?`<button class="primary" onclick="v67ResolveAll()">☁️ Cập nhật toàn bộ ${s.links} vị trí</button>`:`<button class="primary" disabled>☁️ Cần Cloud ADMIN</button>`}<button onclick="openGeoManager()">🧭 Định vị thủ công</button></div>`;
+ $('modal').classList.remove('hidden');
+}
+openAutoGps=v761OpenGpsRecovery;
+const _v761Enter=enterApp;enterApp=function(){_v761Enter();setTimeout(()=>{const n=v761DirectGpsRecovery();const s=v761GpsSummary();if(map){map.invalidateSize();const pts=filtered().filter(validGeo).map(x=>[Number(x.lat),Number(x.lng)]);if(pts.length)map.fitBounds(pts,{padding:[35,35],maxZoom:16});}if(currentUser?.role==='admin'&&s.geo===0&&s.links>0){toast(currentUser?.cloud?'187 cơ sở chưa có GPS. Vào Bản đồ → Cập nhật GPS để khôi phục vị trí.':'Đang LOCAL: cần đăng nhập email ADMIN Cloud để tự lấy GPS từ link Google Maps.');}},350)};
