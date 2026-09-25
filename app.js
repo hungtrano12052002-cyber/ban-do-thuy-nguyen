@@ -835,3 +835,66 @@ renderMarkers=function(){
    markerCluster?markerCluster.addLayer(m):m.addTo(map);markers.push(m);
  }});updateMapNotice();v64Accuracy();v758GeoStatus();
 };
+
+/* ===== V7.6.0 ROBUST CLOUD AUTHORITY / OWNER ADMIN ===== */
+async function v760CloudAccess(uid){
+  if(!supabaseClient||!uid)return {ok:false,error:'missing-client',role:null,tdp_access:[],can_edit:false};
+  // Preferred: SECURITY DEFINER RPC from V7.6.0 migration. It avoids profiles-RLS recursion/visibility issues.
+  try{
+    const r=await supabaseClient.rpc('current_access_profile');
+    if(!r.error&&r.data){
+      const d=Array.isArray(r.data)?r.data[0]:r.data;
+      if(d&&d.role)return {ok:true,role:String(d.role).toLowerCase()==='admin'?'admin':'user',tdp_access:Array.isArray(d.tdp_access)?d.tdp_access:[],can_edit:!!d.can_edit};
+    }
+  }catch(e){}
+  // Compatible fallback for projects where profiles can be read directly.
+  try{
+    const r=await supabaseClient.from('profiles').select('role,tdp_access,can_edit').eq('id',uid).maybeSingle();
+    if(!r.error&&r.data)return {ok:true,role:String(r.data.role).toLowerCase()==='admin'?'admin':'user',tdp_access:Array.isArray(r.data.tdp_access)?r.data.tdp_access:[],can_edit:!!r.data.can_edit};
+  }catch(e){}
+  try{
+    const r=await supabaseClient.from('profiles').select('role').eq('id',uid).maybeSingle();
+    if(!r.error&&r.data)return {ok:true,role:String(r.data.role).toLowerCase()==='admin'?'admin':'user',tdp_access:[],can_edit:String(r.data.role).toLowerCase()==='admin'};
+  }catch(e){}
+  return {ok:false,error:'profile-unreadable',role:null,tdp_access:[],can_edit:false};
+}
+function v760ApplyAccess(a){
+  if(!a?.ok)return false;
+  currentUser.role=a.role;
+  currentUser.tdpAccess=a.role==='admin'?['*']:(a.tdp_access||[]);
+  currentUser.canEdit=a.role==='admin'||!!a.can_edit;
+  currentUser.accessVerified=true;
+  return true;
+}
+login=async function(){
+ const u=$('user').value.trim(),p=$('pass').value;
+ if(cloudEnabled&&u.includes('@')){
+   const {data,error}=await supabaseClient.auth.signInWithPassword({email:u,password:p});
+   if(error)return toast('Đăng nhập thất bại: '+error.message);
+   currentUser={name:data.user.email,cloud:true,id:data.user.id,role:null,tdpAccess:[],canEdit:false,accessVerified:false};
+   const access=await v760CloudAccess(data.user.id);
+   if(!v760ApplyAccess(access)){
+     await supabaseClient.auth.signOut(); currentUser=null;
+     return toast('Không đọc được quyền tài khoản. Hãy chạy SUPABASE_V760_ADMIN_PERMISSION_FIX.sql rồi đăng nhập lại.');
+   }
+   sessionStorage.removeItem('v755_user'); enterApp(); return;
+ }
+ if(u==='admin'&&p===demoAuth.admin.pass){currentUser={name:'admin',role:'admin',cloud:false,tdpAccess:['*'],canEdit:true,accessVerified:true};sessionStorage.setItem('demo_user','admin');enterApp();return}
+ const local=v755Accounts().find(x=>normSearch(x.username)===normSearch(u)&&x.enabled!==false);
+ if(local&&local.passwordHash===await v755Hash(p,local.salt)){currentUser={name:local.username,role:'user',cloud:false,id:local.id,tdpAccess:local.tdpAccess||[],canEdit:!!local.canEdit,accessVerified:true};sessionStorage.setItem('v755_user',JSON.stringify(currentUser));enterApp();return}
+ toast('Sai tài khoản/mật khẩu hoặc tài khoản đã bị khóa.');
+};
+// Do not silently downgrade an authenticated cloud account. Revalidate authority before loading data.
+const _v760Enter=enterApp;enterApp=function(){
+ const go=async()=>{
+   if(currentUser?.cloud&&currentUser?.id){
+     const a=await v760CloudAccess(currentUser.id);
+     if(!v760ApplyAccess(a)){
+       $('login')?.classList.remove('hidden'); $('app')?.classList.add('hidden');
+       toast('Không xác minh được quyền Cloud. Không áp dụng bộ lọc USER · 0 TDP.'); return;
+     }
+   }
+   _v760Enter();
+   setTimeout(()=>{const r=$('role');if(r)r.textContent=v755IsSuper()?'ADMIN · TOÀN PHƯỜNG':`USER · ${currentUser?.tdpAccess?.length||0} TDP`;v755ScopeBanner();renderAll();},160);
+ }; go();
+};
