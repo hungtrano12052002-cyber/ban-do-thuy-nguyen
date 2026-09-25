@@ -1054,3 +1054,69 @@ function v764CleanGpsUi(){
 }
 setTimeout(v764CleanGpsUi,1000);
 const _v764RenderAll=renderAll;renderAll=function(){_v764RenderAll();setTimeout(v764CleanGpsUi,0)};
+
+/* ===== V7.7.0 SINGLE AUTHORITY CORE ===== */
+const V770='7.7.0';
+let v770AuthEpoch=0;
+function v770IsAdmin(){return String(currentUser?.role||'').toLowerCase()==='admin' && currentUser?.accessVerified===true}
+async function v770ReadAccess(uid){
+ if(!supabaseClient||!uid)return {ok:false,error:'missing-client'};
+ // Canonical server-side function (V7.7.0 migration). It returns only the signed-in user's own access.
+ try{
+   const r=await supabaseClient.rpc('get_my_access');
+   if(!r.error){const d=Array.isArray(r.data)?r.data[0]:r.data;if(d&&d.role)return {ok:true,role:String(d.role).toLowerCase()==='admin'?'admin':'user',tdp_access:Array.isArray(d.tdp_access)?d.tdp_access:[],can_edit:!!d.can_edit};}
+ }catch(_e){}
+ // Compatibility fallback for projects where own-profile SELECT is already allowed.
+ try{
+   const r=await supabaseClient.from('profiles').select('role,tdp_access,can_edit').eq('id',uid).maybeSingle();
+   if(!r.error&&r.data?.role)return {ok:true,role:String(r.data.role).toLowerCase()==='admin'?'admin':'user',tdp_access:Array.isArray(r.data.tdp_access)?r.data.tdp_access:[],can_edit:!!r.data.can_edit};
+ }catch(_e){}
+ try{
+   const r=await supabaseClient.from('profiles').select('role').eq('id',uid).maybeSingle();
+   if(!r.error&&r.data?.role)return {ok:true,role:String(r.data.role).toLowerCase()==='admin'?'admin':'user',tdp_access:[],can_edit:String(r.data.role).toLowerCase()==='admin'};
+ }catch(_e){}
+ return {ok:false,error:'Không đọc được hồ sơ quyền. Hãy chạy SUPABASE_V770_AUTH_CORE.sql trong Supabase SQL Editor.'};
+}
+function v770ApplyAccess(a){
+ if(!currentUser||!a?.ok)return false;
+ currentUser.role=a.role;currentUser.accessVerified=true;
+ currentUser.tdpAccess=a.role==='admin'?['*']:(a.tdp_access||[]);
+ currentUser.canEdit=a.role==='admin'||!!a.can_edit;
+ sessionStorage.setItem('v770_access',JSON.stringify({id:currentUser.id||null,role:currentUser.role,tdpAccess:currentUser.tdpAccess,canEdit:currentUser.canEdit}));
+ return true;
+}
+// Final authoritative scope. ADMIN never passes through TDP filtering.
+filtered=function(){
+ let arr=[...places];
+ if(!v770IsAdmin())arr=arr.filter(v755AllowedTdp);
+ const q=normSearch($('q')?.value||'');
+ const field=$('field')?.value||'all',status=$('status')?.value||'all';
+ if(q)arr=arr.filter(x=>normSearch(field==='all'?Object.values(x).join(' '):(x[field]||'')).includes(q));
+ if(status!=='all')arr=arr.filter(x=>status==='active'?isActive(x.status):!isActive(x.status));
+ return arr;
+};
+function v770PaintAuthority(){
+ const r=$('role');if(r)r.textContent=v770IsAdmin()?'ADMIN · TOÀN PHƯỜNG':`USER · ${currentUser?.tdpAccess?.length||0} TDP`;
+ document.body.dataset.role=v770IsAdmin()?'admin':'user';v755ScopeBanner();
+}
+login=async function(){
+ const epoch=++v770AuthEpoch,u=$('user').value.trim(),p=$('pass').value;
+ if(u==='admin'&&p===demoAuth.admin.pass){currentUser={name:'admin',role:'admin',cloud:false,tdpAccess:['*'],canEdit:true,accessVerified:true};sessionStorage.setItem('demo_user','admin');enterApp();setTimeout(()=>{v770PaintAuthority();renderAll()},50);return;}
+ const local=await v755LocalLogin(u,p);if(local){currentUser={...local,accessVerified:true};sessionStorage.setItem('v755_user',JSON.stringify(currentUser));enterApp();setTimeout(()=>{v770PaintAuthority();renderAll()},50);return;}
+ if(!(cloudEnabled&&u.includes('@')))return toast('Sai tài khoản/mật khẩu hoặc tài khoản đã bị khóa.');
+ const {data,error}=await supabaseClient.auth.signInWithPassword({email:u,password:p});if(error)return toast('Đăng nhập thất bại: '+error.message);
+ if(epoch!==v770AuthEpoch)return;
+ currentUser={name:data.user.email,cloud:true,id:data.user.id,role:null,tdpAccess:[],canEdit:false,accessVerified:false};
+ const a=await v770ReadAccess(data.user.id);if(!v770ApplyAccess(a)){await supabaseClient.auth.signOut();currentUser=null;return toast(a.error||'Không xác minh được quyền tài khoản.');}
+ enterApp();setTimeout(async()=>{v770PaintAuthority();await loadCurrentMode();renderAll();v758GeoStatus()},80);
+};
+restoreSession=async function(){
+ if(cloudEnabled){
+   const {data}=await supabaseClient.auth.getSession();const s=data?.session;
+   if(s?.user){currentUser={name:s.user.email,cloud:true,id:s.user.id,role:null,tdpAccess:[],canEdit:false,accessVerified:false};const a=await v770ReadAccess(s.user.id);if(v770ApplyAccess(a)){enterApp();setTimeout(async()=>{v770PaintAuthority();await loadCurrentMode();renderAll()},80);return;}await supabaseClient.auth.signOut();currentUser=null;toast(a.error||'Phiên đăng nhập không xác minh được quyền.');}
+ }
+ const saved=sessionStorage.getItem('v755_user');if(saved){try{currentUser={...JSON.parse(saved),accessVerified:true};enterApp();setTimeout(()=>{v770PaintAuthority();renderAll()},50);return}catch(_e){}}
+ const u=sessionStorage.getItem('demo_user');if(u==='admin'){currentUser={name:'admin',role:'admin',cloud:false,tdpAccess:['*'],canEdit:true,accessVerified:true};enterApp();setTimeout(()=>{v770PaintAuthority();renderAll()},50)}
+};
+// Protect against legacy wrappers mutating an already verified ADMIN after entry.
+setInterval(()=>{if(currentUser?.accessVerified===true&&String(currentUser.role).toLowerCase()==='admin'){if(!Array.isArray(currentUser.tdpAccess)||currentUser.tdpAccess[0]!=='*')currentUser.tdpAccess=['*'];const r=$('role');if(r&&r.textContent!=='ADMIN · TOÀN PHƯỜNG'){r.textContent='ADMIN · TOÀN PHƯỜNG';renderAll();}}},1200);
