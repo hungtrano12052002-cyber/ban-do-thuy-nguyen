@@ -1018,3 +1018,39 @@ function v763OpenGps(){
  $('modal').classList.remove('hidden');
 }
 openAutoGps=v763OpenGps;v67OpenResolver=v763OpenGps;
+
+/* ===== V7.6.4 UNIFIED GPS MANAGER ===== */
+function v764ScopeRows(){
+  // ADMIN always manages the authoritative loaded dataset; USER only sees permitted rows.
+  if(currentUser?.role==='admin') return Array.isArray(places)?places:[];
+  return filtered();
+}
+function v764GpsSummary(){
+  const rows=v764ScopeRows(),geo=rows.filter(validGeo).length;
+  const links=rows.filter(x=>!validGeo(x)&&String(x.mapsUrl||'').trim()).length;
+  return {rows,total:rows.length,geo,missing:rows.length-geo,links};
+}
+v761GpsSummary=function(){const s=v764GpsSummary();return {total:s.total,geo:s.geo,missing:s.missing,links:s.links}};
+v763GpsRows=function(){return v764ScopeRows().filter(x=>!validGeo(x)&&String(x.mapsUrl||'').trim())};
+openGeoManager=function(){
+  if(currentUser?.role!=='admin')return toast('Chỉ ADMIN được quản lý vị trí cơ sở.');
+  const s=v764GpsSummary(),missing=s.rows.filter(x=>!validGeo(x));
+  $('modalCard').innerHTML=`<div class="modal-head"><h2>📍 Quản lý GPS</h2><button onclick="closeModal()">×</button></div>
+  <div class="v67-kpis"><div><b>${s.total}</b><span>Tổng cơ sở</span></div><div><b>${s.geo}</b><span>Đã có vị trí</span></div><div><b>${s.missing}</b><span>Chưa định vị</span></div></div>
+  <div class="v67-info">Một hệ thống GPS duy nhất đang dùng dữ liệu hiện tại của ADMIN. ${v763ResolverAvailable()?'Bộ phân giải Google Maps đã sẵn sàng.':'Chưa kết nối resolve-map-link; vẫn có thể đặt vị trí thủ công.'}</div>
+  <div class="geo-actions"><button class="primary" onclick="v763OpenGps()">📌 Đồng bộ Google Maps (${s.links})</button><button onclick="v764StartManual()" ${s.missing?'':'disabled'}>🧭 Định vị thủ công (${s.missing})</button><button onclick="fitAll();closeModal()">🗺️ Xem toàn bộ điểm</button></div>
+  <div class="unlocated-list">${missing.slice(0,120).map(x=>`<button onclick="closeModal();openEditor('${escJs(x.id)}')"><b>${esc(x.name||'Cơ sở')}</b><small>${esc(x.wardBlock||'Chưa có TDP')} · ${x.mapsUrl?'Có Google Maps':'Chưa có link Maps'}</small></button>`).join('')||'<div class="empty">Tất cả cơ sở đã có tọa độ.</div>'}</div>`;
+  $('modal').classList.remove('hidden');
+};
+function v764StartManual(){
+  v65Queue=v764ScopeRows().filter(x=>!validGeo(x)).map(x=>String(x.id));v65QueueIndex=0;closeModal();
+  if(!v65Queue.length)return toast('Tất cả cơ sở đã có vị trí.');openGeoQueueItem();
+}
+startGeoQueue=v764StartManual;
+function v764CleanGpsUi(){
+  document.querySelectorAll('#geoManagerBtn,#v67AutoGpsTop').forEach(e=>e.remove());
+  const top=document.querySelector('.map-tools')||document.querySelector('.toolbar');
+  if(top&&!document.getElementById('v764GpsBtn')){const b=document.createElement('button');b.id='v764GpsBtn';b.className='geo-manager-btn admin-only';b.innerHTML='📍 <span>Quản lý GPS</span>';b.onclick=openGeoManager;top.appendChild(b)}
+}
+setTimeout(v764CleanGpsUi,1000);
+const _v764RenderAll=renderAll;renderAll=function(){_v764RenderAll();setTimeout(v764CleanGpsUi,0)};
