@@ -776,3 +776,62 @@ function v758GeoStatus(){const n=filtered().filter(validGeo).length,total=filter
 const _v758RenderMarkers=renderMarkers;renderMarkers=function(){_v758RenderMarkers();v758GeoStatus()}
 const _v758ShowMap=v753ShowMap;v753ShowMap=function(){_v758ShowMap();setTimeout(()=>{v758InstallSearch();v67ResolveDirectUrls();v758GeoStatus();if(map)map.invalidateSize()},120)}
 const _v758Enter=enterApp;enterApp=function(){_v758Enter();setTimeout(v758InstallSearch,250)}
+
+/* ===== V7.5.9 AUTH/PERMISSION RECOVERY + MAP VISIBILITY FIX ===== */
+async function v759CloudProfile(uid){
+  let prof={role:'user',tdp_access:[],can_edit:false};
+  if(!supabaseClient||!uid)return prof;
+  // New schema first. If 7.5.5 migration has not been run, fall back to legacy role-only profile.
+  try{
+    const r=await supabaseClient.from('profiles').select('role,tdp_access,can_edit').eq('id',uid).maybeSingle();
+    if(!r.error&&r.data)return {role:r.data.role==='admin'?'admin':'user',tdp_access:Array.isArray(r.data.tdp_access)?r.data.tdp_access:[],can_edit:!!r.data.can_edit};
+  }catch(e){}
+  try{
+    const r=await supabaseClient.from('profiles').select('role').eq('id',uid).maybeSingle();
+    if(!r.error&&r.data)return {role:r.data.role==='admin'?'admin':'user',tdp_access:[],can_edit:r.data.role==='admin'};
+  }catch(e){}
+  return prof;
+}
+
+// Replace the stacked 7.5.5 login behavior with a migration-safe login.
+login=async function(){
+ const u=$('user').value.trim(),p=$('pass').value;
+ if(cloudEnabled&&u.includes('@')){
+   const {data,error}=await supabaseClient.auth.signInWithPassword({email:u,password:p});
+   if(error)return toast('Đăng nhập thất bại: '+error.message);
+   const prof=await v759CloudProfile(data.user.id);
+   currentUser={name:data.user.email,role:prof.role,cloud:true,id:data.user.id,tdpAccess:prof.tdp_access||[],canEdit:prof.role==='admin'||!!prof.can_edit};
+   sessionStorage.removeItem('v755_user');
+   enterApp();return;
+ }
+ const a=demoAuth[u];
+ if(a&&a.pass===p){currentUser={name:u,role:a.role,cloud:false,tdpAccess:[],canEdit:a.role==='admin'};sessionStorage.setItem('demo_user',u);enterApp();return}
+ const local=v755Accounts().find(x=>normSearch(x.username)===normSearch(u)&&x.enabled!==false);
+ if(local&&local.passwordHash===await v755Hash(p,local.salt)){currentUser={name:local.username,role:'user',cloud:false,id:local.id,tdpAccess:local.tdpAccess||[],canEdit:!!local.canEdit};sessionStorage.setItem('v755_user',JSON.stringify(currentUser));enterApp();return}
+ toast('Sai tài khoản/mật khẩu hoặc tài khoản đã bị khóa.');
+};
+
+// Repair a stale cloud session that was incorrectly downgraded to USER when tdp_access columns did not exist.
+const _v759Enter=enterApp;enterApp=function(){
+  const run=async()=>{
+    if(currentUser?.cloud&&currentUser?.id){
+      const prof=await v759CloudProfile(currentUser.id);
+      currentUser.role=prof.role; currentUser.tdpAccess=prof.tdp_access||[]; currentUser.canEdit=prof.role==='admin'||!!prof.can_edit;
+    }
+    _v759Enter();
+    setTimeout(()=>{renderAll();v758GeoStatus();if(map){map.invalidateSize();const pts=filtered().filter(validGeo).map(x=>[Number(x.lat),Number(x.lng)]);if(pts.length)map.fitBounds(pts,{padding:[35,35],maxZoom:16});}},180);
+  }; run();
+};
+
+// Keep marker click useful: popup + detail, without re-rendering markers before popup can open.
+renderMarkers=function(){
+ if(!map)return;if(markerCluster)markerCluster.clearLayers();markers=[];
+ filtered().forEach(x=>{if(validGeo(x)){
+   const m=L.marker([Number(x.lat),Number(x.lng)],{icon:v64Icon(x),riseOnHover:true,title:x.name});
+   const cover=v754Cover(x),cp=v754Completion(x);
+   m.bindPopup(`<div class="v754-map-card">${cover?`<img src="${escAttr(cover)}" alt="Ảnh cơ sở" onerror="this.remove()">`:'<div class="v754-map-noimg">🏠</div>'}<div><b>${esc(x.name||'Cơ sở')}</b><small>${esc(x.category||'Cơ sở')} · ${esc(x.wardBlock||'Chưa có TDP')}</small><span>Hoàn thiện ${cp.pct}%</span><button type="button" onclick="showDetail(places.find(p=>String(p.id)==='${escJs(x.id)}'))">Xem chi tiết</button></div></div>`,{maxWidth:310,className:'v754-popup'});
+   m.bindTooltip(esc(x.name||'Cơ sở'),{direction:'top',offset:[0,-34]});
+   m.on('click',()=>{selectedId=x.id;renderList();setTimeout(()=>showDetail(x),80)});
+   markerCluster?markerCluster.addLayer(m):m.addTo(map);markers.push(m);
+ }});updateMapNotice();v64Accuracy();v758GeoStatus();
+};
