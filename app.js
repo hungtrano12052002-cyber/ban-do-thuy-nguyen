@@ -1120,3 +1120,95 @@ restoreSession=async function(){
 };
 // Protect against legacy wrappers mutating an already verified ADMIN after entry.
 setInterval(()=>{if(currentUser?.accessVerified===true&&String(currentUser.role).toLowerCase()==='admin'){if(!Array.isArray(currentUser.tdpAccess)||currentUser.tdpAccess[0]!=='*')currentUser.tdpAccess=['*'];const r=$('role');if(r&&r.textContent!=='ADMIN · TOÀN PHƯỜNG'){r.textContent='ADMIN · TOÀN PHƯỜNG';renderAll();}}},1200);
+
+/* ===== V7.7.1 GPS TRANSPORT FIX ===== */
+const V771='7.7.1';
+function v771ConfigReady(){return !!(cfg?.SUPABASE_URL&&cfg?.SUPABASE_ANON_KEY)}
+function v771FunctionUrl(){return String(cfg.SUPABASE_URL||'').replace(/\/$/,'')+'/functions/v1/resolve-map-link'}
+async function v771ResolveViaFetch(url){
+ if(!v771ConfigReady()) throw new Error('Thiếu SUPABASE_URL / SUPABASE_ANON_KEY trong config.js');
+ const key=cfg.SUPABASE_ANON_KEY;
+ const res=await fetch(v771FunctionUrl(),{method:'POST',headers:{'Content-Type':'application/json','apikey':key,'Authorization':'Bearer '+key},body:JSON.stringify({url})});
+ let data=null;try{data=await res.json()}catch(_e){}
+ if(!res.ok||!data?.ok) throw new Error(data?.error||`Edge Function HTTP ${res.status}`);
+ const lat=Number(data.lat),lng=Number(data.lng);
+ if(!Number.isFinite(lat)||!Number.isFinite(lng))throw new Error('Edge Function không trả về tọa độ hợp lệ');
+ return {lat,lng,finalUrl:data.finalUrl||url,source:'resolve-map-link'};
+}
+v763ResolverAvailable=function(){return !!((supabaseClient&&v771ConfigReady())||v771ConfigReady())};
+v763ResolveOne=async function(x){
+ const direct=parseCoords(String(x.mapsUrl||''));
+ if(direct&&Number.isFinite(direct[0])&&Number.isFinite(direct[1]))return {lat:direct[0],lng:direct[1],finalUrl:x.mapsUrl,source:'url'};
+ if(!String(x.mapsUrl||'').trim())throw new Error('Cơ sở chưa có link Google Maps');
+ let firstErr=null;
+ if(supabaseClient){try{
+   const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:x.mapsUrl}});
+   if(error)throw error;
+   if(data?.ok&&Number.isFinite(Number(data.lat))&&Number.isFinite(Number(data.lng)))return {lat:Number(data.lat),lng:Number(data.lng),finalUrl:data.finalUrl||x.mapsUrl,source:'resolve-map-link'};
+   throw new Error(data?.error||'Không tìm thấy tọa độ');
+ }catch(e){firstErr=e}}
+ try{return await v771ResolveViaFetch(x.mapsUrl)}catch(e){throw new Error((e?.message||String(e))+(firstErr?` · SDK: ${firstErr?.message||firstErr}`:''))}
+};
+async function v771TestResolver(){
+ const rows=v764ScopeRows().filter(x=>String(x.mapsUrl||'').trim());
+ if(!rows.length)return toast('Không có cơ sở nào có link Google Maps.');
+ const x=rows[0],box=$('v771Diag');if(box)box.textContent='Đang kiểm tra kết nối...';
+ try{const r=await v763ResolveOne(x);if(box)box.innerHTML=`<b>✓ Bộ phân giải hoạt động</b><br>${esc(x.name)} → ${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}`;toast('Kết nối GPS hoạt động.');}
+ catch(e){if(box)box.innerHTML=`<b>✕ Không gọi được resolve-map-link</b><br>${esc(e?.message||String(e))}<br><small>Kiểm tra Edge Function đã Deploy và config.js vẫn còn trên GitHub.</small>`;toast('Không kết nối được bộ phân giải GPS.');}
+}
+openGeoManager=function(){
+ if(currentUser?.role!=='admin')return toast('Chỉ ADMIN được quản lý vị trí cơ sở.');
+ const s=v764GpsSummary(),missing=s.rows.filter(x=>!validGeo(x)),cfgOk=v771ConfigReady();
+ $('modalCard').innerHTML=`<div class="modal-head"><h2>📍 Quản lý GPS · V7.7.1</h2><button onclick="closeModal()">×</button></div>
+ <div class="v67-kpis"><div><b>${s.total}</b><span>Tổng cơ sở</span></div><div><b>${s.geo}</b><span>Đã có vị trí</span></div><div><b>${s.missing}</b><span>Chưa định vị</span></div></div>
+ <div class="v67-info"><b>Dữ liệu:</b> ${s.total} cơ sở · <b>Google Maps:</b> ${s.links} link chưa định vị.<br><b>config.js:</b> ${cfgOk?'✓ Đã nhận cấu hình':'✕ Chưa nhận cấu hình'}. V7.7.1 có thể gọi Edge Function trực tiếp ngay cả khi giao diện đang hiển thị LOCAL.</div>
+ <div id="v771Diag" class="v67-info" style="margin-top:8px">Chọn <b>Kiểm tra kết nối</b> trước. Nếu thành công, chạy đồng bộ toàn bộ.</div>
+ <div class="geo-actions"><button onclick="v771TestResolver()">🧪 Kiểm tra kết nối</button><button class="primary" onclick="v763SyncGps()" ${s.links?'':'disabled'}>📌 Đồng bộ Google Maps (${s.links})</button><button onclick="v764StartManual()" ${s.missing?'':'disabled'}>🧭 Định vị thủ công (${s.missing})</button><button onclick="fitAll();closeModal()">🗺️ Xem toàn bộ điểm</button></div>
+ <div class="unlocated-list">${missing.slice(0,120).map(x=>`<button onclick="closeModal();openEditor('${escJs(x.id)}')"><b>${esc(x.name||'Cơ sở')}</b><small>${esc(x.wardBlock||'Chưa có TDP')} · ${x.mapsUrl?'Có Google Maps':'Chưa có link Maps'}</small></button>`).join('')||'<div class="empty">Tất cả cơ sở đã có tọa độ.</div>'}</div>`;
+ $('modal').classList.remove('hidden');
+};
+openAutoGps=openGeoManager;v67OpenResolver=openGeoManager;
+
+/* ===== V7.7.2 ADMIN ACCOUNT PROFILE ===== */
+const V772='7.7.2';
+async function v772AuthUser(){
+ if(!supabaseClient)return null;
+ try{const {data}=await supabaseClient.auth.getUser();return data?.user||null}catch(e){return null}
+}
+async function v772OpenAdminProfile(){
+ if(!v770IsAdmin())return toast('Chỉ ADMIN được sửa tài khoản chủ.');
+ const u=await v772AuthUser();
+ const email=u?.email||((currentUser?.cloud&&String(currentUser?.name||'').includes('@'))?currentUser.name:'');
+ let displayName='';
+ if(u){try{const r=await supabaseClient.from('profiles').select('display_name').eq('id',u.id).maybeSingle();if(!r.error)displayName=r.data?.display_name||''}catch(e){}}
+ $('modalCard').innerHTML=`<div class="modal-head"><h2>👑 Tài khoản ADMIN</h2><button onclick="v755OpenAccounts()">←</button></div>
+ <div class="v755-note">Email ADMIN được lấy trực tiếp từ tài khoản Supabase Auth đang đăng nhập. Bạn có thể đổi tên hiển thị và mật khẩu tại đây.</div>
+ <form onsubmit="v772SaveAdminProfile(event)">
+ <label>Email Supabase<input id="v772_email" type="email" value="${escAttr(email)}" readonly></label>
+ <label>Tên hiển thị<input id="v772_name" maxlength="80" value="${escAttr(displayName)}" placeholder="Ví dụ: Quản trị viên CAP Thủy Nguyên"></label>
+ <label>Mật khẩu mới<input id="v772_pass" type="password" minlength="6" autocomplete="new-password" placeholder="Để trống nếu không đổi"></label>
+ <label>Xác nhận mật khẩu mới<input id="v772_pass2" type="password" minlength="6" autocomplete="new-password" placeholder="Nhập lại mật khẩu mới"></label>
+ <div class="modal-actions"><button type="button" onclick="v755OpenAccounts()">Hủy</button><button class="primary" type="submit">💾 Lưu thay đổi</button></div></form>`;
+ $('modal').classList.remove('hidden');
+}
+async function v772SaveAdminProfile(e){
+ e.preventDefault();if(!v770IsAdmin())return toast('Chỉ ADMIN được thực hiện.');
+ if(!supabaseClient)return toast('Chưa kết nối Supabase.');
+ const u=await v772AuthUser();if(!u)return toast('Hãy đăng nhập bằng email ADMIN Supabase để sửa tài khoản.');
+ const name=String($('v772_name')?.value||'').trim(),p=String($('v772_pass')?.value||''),p2=String($('v772_pass2')?.value||'');
+ if(p&&p!==p2)return toast('Xác nhận mật khẩu chưa khớp.');
+ if(p&&p.length<6)return toast('Mật khẩu mới phải có ít nhất 6 ký tự.');
+ if(name){
+   try{const r=await supabaseClient.from('profiles').update({display_name:name}).eq('id',u.id);if(r.error)throw r.error}catch(err){return toast('Không lưu được tên: '+(err?.message||err));}
+ }
+ if(p){const r=await supabaseClient.auth.updateUser({password:p});if(r.error)return toast('Không đổi được mật khẩu: '+r.error.message);}
+ currentUser.name=u.email;toast(p?'Đã cập nhật tên và mật khẩu ADMIN.':'Đã cập nhật thông tin ADMIN.');v755OpenAccounts();
+}
+const _v772Accounts=v755OpenAccounts;v755OpenAccounts=async function(){
+ if(!v755IsSuper())return toast('Chỉ tài khoản chủ ADMIN được quản lý phân quyền.');
+ _v772Accounts();
+ const c=$('modalCard');if(!c)return;
+ const u=await v772AuthUser(),email=u?.email||((currentUser?.cloud&&String(currentUser?.name||'').includes('@'))?currentUser.name:'');
+ const note=c.querySelector('.v755-note');
+ if(note)note.insertAdjacentHTML('afterend',`<div class="v755-account" style="margin:10px 0"><div><b>👑 ADMIN</b><small>${email?`Email Supabase: ${esc(email)}`:'Chưa đăng nhập bằng email Supabase'}</small><span><i>Toàn bộ TDP</i><i>Toàn quyền</i></span></div><button onclick="v772OpenAdminProfile()">Sửa tên / mật khẩu</button></div>`);
+};
