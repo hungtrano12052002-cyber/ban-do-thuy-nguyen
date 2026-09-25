@@ -761,3 +761,18 @@ const _v757Dash=v753ShowDashboard;v753ShowDashboard=function(){v757Mode('dashboa
 const _v757Map=v753ShowMap;v753ShowMap=function(){v757Mode('map');const r=_v757Map();setTimeout(v75RefreshMap,100);return r};
 const _v757List=v753ShowList;v753ShowList=function(){v757Mode('list');return _v757List()};
 const _v757Mobile=showMobileTab;showMobileTab=function(tab){v757Mode(tab==='list'?'list':'map');return _v757Mobile(tab)};
+
+/* ===== V7.5.8 MAP PRECISION + SEARCH ===== */
+function v758MapSearchResults(q){
+ q=normSearch(q||''); const box=$('v758SearchResults'); if(!box)return;
+ if(!q){box.innerHTML='';box.classList.add('hidden');return}
+ const rows=filtered().filter(x=>normSearch([x.name,x.category,x.wardBlock,x.ownerName,x.managerName,x.officer,x.ownerPhone,x.managerPhone].join(' ')).includes(q)).slice(0,8);
+ box.innerHTML=rows.length?rows.map(x=>`<button type="button" onclick="v758Pick('${escJs(x.id)}')"><span class="v758-pin-mini"></span><div><b>${esc(x.name||'Cơ sở')}</b><small>${esc(x.category||'Cơ sở')} · ${esc(x.wardBlock||'Chưa có TDP')}</small></div><em>${validGeo(x)?'Có vị trí':'Chưa có GPS'}</em></button>`).join(''):'<div class="v758-no-result">Không tìm thấy cơ sở phù hợp.</div>';
+ box.classList.remove('hidden');
+}
+function v758Pick(id){const x=places.find(p=>String(p.id)===String(id));if(!x)return;const q=$('mapQuickSearch');if(q)q.value=x.name||'';const s=$('search');if(s)s.value=x.name||'';const box=$('v758SearchResults');if(box)box.classList.add('hidden');selectedId=x.id;renderAll();if(validGeo(x)&&map){map.setView([Number(x.lat),Number(x.lng)],18,{animate:true});setTimeout(()=>{const m=markers.find(mm=>mm.options?.title===x.name);if(m)m.openPopup()},250)}showDetail(x)}
+function v758InstallSearch(){const wrap=document.querySelector('.v66-map-search');if(!wrap||$('v758SearchResults'))return;wrap.insertAdjacentHTML('beforeend','<div id="v758SearchResults" class="v758-search-results hidden"></div>');const q=$('mapQuickSearch');if(q){q.setAttribute('autocomplete','off');q.placeholder='Tìm nhanh tên cơ sở, TDP, chủ cơ sở, cán bộ…';q.oninput=function(){v66QuickSearch(this.value);v758MapSearchResults(this.value)}}}
+function v758GeoStatus(){const n=filtered().filter(validGeo).length,total=filtered().length;let e=$('v758GeoStatus');if(!e){e=document.createElement('div');e.id='v758GeoStatus';e.className='v758-geo-status';document.querySelector('main')?.appendChild(e)}e.innerHTML=`<b>${n}/${total}</b><span>cơ sở có vị trí chính xác</span>${currentUser?.role==='admin'&&n<total?'<button onclick="openAutoGps()">Cập nhật GPS</button>':''}`}
+const _v758RenderMarkers=renderMarkers;renderMarkers=function(){_v758RenderMarkers();v758GeoStatus()}
+const _v758ShowMap=v753ShowMap;v753ShowMap=function(){_v758ShowMap();setTimeout(()=>{v758InstallSearch();v67ResolveDirectUrls();v758GeoStatus();if(map)map.invalidateSize()},120)}
+const _v758Enter=enterApp;enterApp=function(){_v758Enter();setTimeout(v758InstallSearch,250)}

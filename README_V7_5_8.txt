@@ -1,0 +1,11 @@
+V7.5.8 - MAP PRECISION & SEARCH
+- Bản đồ tập trung hiển thị vị trí cơ sở có tọa độ chính xác.
+- Marker CSS thuần, không phụ thuộc icon ảnh bên ngoài.
+- Click marker mở ảnh + tên + loại + TDP + nút xem chi tiết.
+- Tìm kiếm gợi ý tức thời theo tên/TDP/chủ cơ sở/cán bộ.
+- Chọn kết quả sẽ zoom tới vị trí ở mức 18 và mở hồ sơ.
+- Hiện số cơ sở đã có GPS / tổng số cơ sở.
+- ADMIN có nút Cập nhật GPS cho các link Google Maps còn thiếu tọa độ.
+- Tự quét tọa độ nếu URL Google Maps đầy đủ đã chứa lat/lng.
+- Hình nền đăng nhập dùng file cục bộ icons/login-vietnam.jpg, không còn phụ thuộc URL ảnh Internet.
+- Giữ nguyên config.js đang dùng khi cập nhật.
