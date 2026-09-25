@@ -749,7 +749,7 @@ async function v755SaveAccount(e,id){e.preventDefault();const a=v755Accounts(),u
 function v755DeleteAccount(id){if(!confirm('Xóa tài khoản này?'))return;v755SaveAccounts(v755Accounts().filter(x=>String(x.id)!==String(id)));v755OpenAccounts()}
 function v755ExportAccounts(){const blob=new Blob([JSON.stringify({version:'7.5.5',accounts:v755Accounts()},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='phan-quyen-tdp-v755.json';a.click();URL.revokeObjectURL(a.href)}
 function v755ImportAccounts(e){const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.accounts))throw 0;v755SaveAccounts(d.accounts);toast('Đã nhập cấu hình tài khoản.');v755OpenAccounts()}catch(_){toast('File phân quyền không hợp lệ.')}};r.readAsText(f)}
-// V7.7.3 compatibility: legacy V7.5.5 wrapped restoreSession before it existed.
+// V7.7.4 compatibility: legacy V7.5.5 wrapped restoreSession before it existed.
 // Provide a harmless base implementation so the script can finish loading; V7.7.0 replaces it below.
 if(typeof globalThis.restoreSession!=='function') globalThis.restoreSession=async function(){};
 const _v755Restore=globalThis.restoreSession;globalThis.restoreSession=async function(){const s=sessionStorage.getItem('v755_user');if(s){try{currentUser=JSON.parse(s);enterApp();return}catch(e){}}return _v755Restore()};
