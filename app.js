@@ -5,22 +5,6 @@ const SEARCH_FIELDS=['name','category','wardBlock','officer','ownerName','ownerP
 const demoAuth={admin:{pass:'admin123',role:'admin'},user:{pass:'user123',role:'user'}};
 const cfg=window.APP_CONFIG||{};
 const cloudEnabled=!!(cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&window.supabase?.createClient);
-const MAP_FUNCTION_URL='https://cpnxrxnrzfnkmokmbiht.supabase.co/functions/v1/resolve-map-link';
-async function invokeMapResolver(url){
- try{
-  const response=await fetch(MAP_FUNCTION_URL,{
-   method:'POST',
-   headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({url})
-  });
-  let data=null;
-  try{data=await response.json()}catch(e){}
-  if(!response.ok)return {data:null,error:new Error(data?.error||`HTTP ${response.status}`)};
-  return {data,error:null};
- }catch(error){
-  return {data:null,error};
- }
-}
 
 
 /* ===== V6.8.4 CATEGORY HOTFIX =====
@@ -209,7 +193,7 @@ function openOverview(){
  $('modalCard').innerHTML=`<div class="modal-head"><h2>📊 Tổng quan cơ sở</h2><button onclick="closeModal()">×</button></div><div class="overview-kpis"><div><b>${arr.length}</b><span>Tổng cơ sở</span></div><div><b>${active}</b><span>Đang hoạt động</span></div><div><b>${byType.length}</b><span>Loại cơ sở</span></div><div><b>${byTdp.length}</b><span>Tổ dân phố</span></div><div><b>${byOfficer.length}</b><span>Cán bộ phụ trách</span></div></div><p class="overview-note">Số liệu tổng quan theo bộ lọc/tìm kiếm đang áp dụng.</p><div class="overview-grid">${pieCanvas('chartType','Theo loại cơ sở',byType)}${pieCanvas('chartTdp','Theo tổ dân phố',byTdp)}${pieCanvas('chartOfficer','Theo cán bộ phụ trách',byOfficer)}</div>`;
  $('modal').classList.remove('hidden');requestAnimationFrame(()=>{makePie('chartType',byType);makePie('chartTdp',byTdp);makePie('chartOfficer',byOfficer)});
 }
-function makePie(id,rows){const el=$(id);if(!el||!window.Chart)return;new Chart(el,{type:'doughnut',data:{labels:rows.map(r=>r[0]),datasets:[{data:rows.map(r=>r[1]),backgroundColor:chartColors(rows.length),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,usePointStyle:true,font:{size:10}}},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw} cơ sở`}}}}})}
+function makePie(id,rows){const el=$(id);if(!el||!window.Chart)return;try{const old=Chart.getChart?Chart.getChart(el):null;if(old)old.destroy();}catch(_e){};new Chart(el,{type:'doughnut',data:{labels:rows.map(r=>r[0]),datasets:[{data:rows.map(r=>r[1]),backgroundColor:chartColors(rows.length),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'48%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,usePointStyle:true,font:{size:10}}},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw} cơ sở`}}}}})}
 
 function openDataMenu(){
  if(currentUser.role!=='admin')return;
@@ -319,7 +303,7 @@ function v67SetProgress(done,total,msg){const p=total?Math.round(done/total*100)
 function v67Log(msg,ok=true){const e=$('v67Log');if(!e)return;e.insertAdjacentHTML('afterbegin',`<div class="${ok?'ok':'bad'}">${ok?'✓':'!'} ${esc(msg)}</div>`)}
 async function v67SaveResolved(x,lat,lng,finalUrl){x.lat=Number(lat);x.lng=Number(lng);if(finalUrl&&/google\./i.test(finalUrl))x.resolvedMapsUrl=finalUrl;x.coordinateSource='google-map-link';x.coordinateUpdatedAt=new Date().toISOString();if(currentUser?.cloud){const {error}=await supabaseClient.from('places').upsert({id:String(x.id),data:x,updated_at:new Date().toISOString(),updated_by:currentUser.id});if(error)throw error}else persist()}
 function v67ResolveDirectUrls(){let n=0;places.forEach(x=>{if(validGeo(x)||!x.mapsUrl)return;const c=parseCoords(x.mapsUrl);if(c){x.lat=c[0];x.lng=c[1];x.coordinateSource='url';n++}});persist();renderAll();toast(n?`Đã lấy tọa độ cho ${n} cơ sở từ URL đầy đủ.`:'Không có URL đầy đủ mới chứa tọa độ.');v67OpenResolver()}
-async function v67CallResolver(x){if(!supabaseClient)throw new Error('Chưa kết nối Supabase');const {data,error}=await invokeMapResolver(x.mapsUrl);if(error)throw error;if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ');return data}
+async function v67CallResolver(x){if(!supabaseClient)throw new Error('Chưa kết nối Supabase');const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:x.mapsUrl}});if(error)throw error;if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ');return data}
 async function v67ResolveAll(){
  if(v67Resolving)return;if(!currentUser?.cloud||currentUser.role!=='admin')return toast('Cần đăng nhập Cloud Admin.');
  const todo=places.filter(x=>!validGeo(x)&&x.mapsUrl);if(!todo.length)return toast('Tất cả cơ sở có link đã có tọa độ.');
@@ -341,7 +325,7 @@ function v67Unlocated(){return places.filter(x=>!validGeo(x)&&String(x.mapsUrl||
 function v67ResolverReady(){return !!(currentUser?.cloud&&supabaseClient&&cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY)}
 async function v67CallResolver(place){
  if(!v67ResolverReady())throw new Error('Cần đăng nhập Cloud Admin và cấu hình Supabase.');
- const {data,error}=await invokeMapResolver(place.mapsUrl);
+ const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:place.mapsUrl}});
  if(error)throw error;
  if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ trong liên kết.');
  return {lat:Number(data.lat),lng:Number(data.lng),finalUrl:data.finalUrl||place.mapsUrl};
@@ -690,12 +674,18 @@ function v753HideDashboard(){document.body.classList.remove('dashboard-mode');$(
 function v753ShowMap(){v753HideDashboard();showMobileTab('map');v753SetNav('bản đồ');setTimeout(v75RefreshMap,80)}
 function v753ShowList(){v753HideDashboard();showMobileTab('list');v753SetNav('danh sách')}
 function v753OpenPlace(id){v753HideDashboard();v753ShowList();v75OpenFromList(id)}
+function v753ResidentStatusKey(r){const s=normSearch(r?.status||'');if(/tam vang/.test(s))return 'temp';if(/roi|da di/.test(s))return 'left';return 'active'}
+function v780MobileNav(name){document.querySelectorAll('.mobile-nav button').forEach(b=>b.classList.toggle('active',b.dataset.mnav===name))}
 function v753OpenResidents(){
- const rows=filtered().flatMap(p=>(Array.isArray(p.residents)?p.residents:[]).map(r=>({...r,placeName:p.name,wardBlock:p.wardBlock,placeId:p.id})));
- $('modalCard').innerHTML=`<div class="modal-head"><h2>👥 Danh sách người cư trú (${rows.length})</h2><button onclick="closeModal()">×</button></div><div class="resident-page-tools"><input id="v753rq" placeholder="🔎 Tìm họ tên, CCCD, SĐT, cơ sở..." oninput="v753FilterResidents()"><button onclick="v73ExportResidentsCsv()">⬇ Xuất CSV</button></div><div id="v753ResidentTable" class="resident-page-table"></div>`;$('modal').classList.remove('hidden');window.__v753Residents=rows;v753RenderResidents(rows);v753SetNav('người cư trú');
+ v753HideDashboard();v780MobileNav('residents');
+ const rows=filtered().flatMap(p=>(Array.isArray(p.residents)?p.residents:[]).map(r=>({...r,placeName:p.name,wardBlock:p.wardBlock,placeId:p.id,statusKey:v753ResidentStatusKey(r)})));
+ const tdps=[...new Set(rows.map(r=>String(r.wardBlock||'').trim()).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'vi'));
+ const placesOpt=[...new Set(rows.map(r=>String(r.placeName||'').trim()).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'vi'));
+ $('modalCard').innerHTML=`<div class="modal-head"><h2>👥 Danh sách người cư trú <small id="v780ResidentCount">(${rows.length})</small></h2><button onclick="closeModal()">×</button></div><div class="resident-page-tools v780-resident-tools"><div class="v780-search"><span>⌕</span><input id="v753rq" placeholder="Tìm họ tên, CCCD, SĐT, cơ sở..." oninput="v753FilterResidents()"></div><select id="v780rs" onchange="v753FilterResidents()"><option value="">Tất cả trạng thái</option><option value="active">Đang cư trú</option><option value="temp">Tạm vắng</option><option value="left">Đã rời đi</option></select><select id="v780tdp" onchange="v753FilterResidents()"><option value="">Tất cả TDP</option>${tdps.map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="v780place" onchange="v753FilterResidents()"><option value="">Tất cả cơ sở</option>${placesOpt.map(x=>`<option>${esc(x)}</option>`).join('')}</select><button onclick="v73ExportResidentsCsv()">⬇ Xuất CSV</button></div><div id="v753ResidentTable" class="resident-page-table"></div>`;
+ $('modal').classList.remove('hidden');window.__v753Residents=rows;v753RenderResidents(rows);v753SetNav('người cư trú');
 }
-function v753FilterResidents(){const q=normSearch($('v753rq')?.value||'');v753RenderResidents((window.__v753Residents||[]).filter(r=>!q||normSearch(Object.values(r).join(' ')).includes(q)))}
-function v753RenderResidents(rows){const b=$('v753ResidentTable');if(!b)return;b.innerHTML=rows.length?`<table><thead><tr><th>Họ tên</th><th>Năm sinh</th><th>CCCD</th><th>SĐT</th><th>Cơ sở</th><th>TDP</th><th>Trạng thái</th></tr></thead><tbody>${rows.map(r=>`<tr onclick="closeModal();v753OpenPlace('${escJs(r.placeId)}')"><td><b>${esc(r.name||'—')}</b></td><td>${esc(r.birthYear||r.year||'—')}</td><td>${esc(r.cccd||'—')}</td><td>${esc(r.phone||'—')}</td><td>${esc(r.placeName||'—')}</td><td>${esc(r.wardBlock||'—')}</td><td><span class="resident-status">${esc(r.status||'Đang ở')}</span></td></tr>`).join('')}</tbody></table>`:'<div class="v7-empty">Chưa có dữ liệu người cư trú dạng bảng.</div>'}
+function v753FilterResidents(){const q=normSearch($('v753rq')?.value||''),st=$('v780rs')?.value||'',tdp=$('v780tdp')?.value||'',pl=$('v780place')?.value||'';const rows=(window.__v753Residents||[]).filter(r=>(!q||normSearch(Object.values(r).join(' ')).includes(q))&&(!st||r.statusKey===st)&&(!tdp||r.wardBlock===tdp)&&(!pl||r.placeName===pl));const c=$('v780ResidentCount');if(c)c.textContent=`(${rows.length})`;v753RenderResidents(rows)}
+function v753RenderResidents(rows){const b=$('v753ResidentTable');if(!b)return;if(!rows.length){b.innerHTML='<div class="v7-empty">Không có người cư trú phù hợp bộ lọc.</div>';return}b.innerHTML=`<div class="v780-resident-cards">${rows.map(r=>`<button onclick="closeModal();v753OpenPlace('${escJs(r.placeId)}')"><div class="v780-r-main"><b>${esc(r.name||'Chưa có họ tên')}</b><span class="resident-status ${escAttr(r.statusKey||'active')}">${esc(r.status||'Đang cư trú')}</span></div><small>${esc(r.birthYear||r.year||'—')} · CCCD: ${esc(r.cccd||'—')} · ${esc(r.phone||'Chưa có SĐT')}</small><p>🏠 ${esc(r.placeName||'—')}<br>📍 ${esc(r.wardBlock||'Chưa xác định TDP')}</p></button>`).join('')}</div><table><thead><tr><th>Họ tên</th><th>Năm sinh</th><th>CCCD</th><th>SĐT</th><th>Cơ sở</th><th>TDP</th><th>Trạng thái</th></tr></thead><tbody>${rows.map(r=>`<tr onclick="closeModal();v753OpenPlace('${escJs(r.placeId)}')"><td><b>${esc(r.name||'—')}</b></td><td>${esc(r.birthYear||r.year||'—')}</td><td>${esc(r.cccd||'—')}</td><td>${esc(r.phone||'—')}</td><td>${esc(r.placeName||'—')}</td><td>${esc(r.wardBlock||'—')}</td><td><span class="resident-status ${escAttr(r.statusKey||'active')}">${esc(r.status||'Đang cư trú')}</span></td></tr>`).join('')}</tbody></table>`}
 const _v753EnterApp=enterApp;enterApp=function(){_v753EnterApp();setTimeout(v753ShowDashboard,120)};
 const _v753RenderAll=renderAll;renderAll=function(){_v753RenderAll();if(document.body.classList.contains('dashboard-mode'))setTimeout(v753ShowDashboard,0)};
 
@@ -989,7 +979,7 @@ async function v763ResolveOne(x){
  const direct=parseCoords(String(x.mapsUrl||''));
  if(direct&&Number.isFinite(direct[0])&&Number.isFinite(direct[1])) return {lat:direct[0],lng:direct[1],finalUrl:x.mapsUrl,source:'url'};
  if(!v763ResolverAvailable()) throw new Error('Chưa kết nối bộ phân giải Google Maps');
- const {data,error}=await invokeMapResolver(x.mapsUrl);
+ const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:x.mapsUrl}});
  if(error)throw error;
  if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ');
  return {lat:Number(data.lat),lng:Number(data.lng),finalUrl:data.finalUrl||x.mapsUrl,source:'resolve-map-link'};
@@ -1142,12 +1132,13 @@ setInterval(()=>{if(currentUser?.accessVerified===true&&String(currentUser.role)
 
 /* ===== V7.7.1 GPS TRANSPORT FIX ===== */
 const V771='7.7.1';
-function v771ConfigReady(){return !!(cfg?.SUPABASE_URL&&cfg?.SUPABASE_ANON_KEY)}
-function v771FunctionUrl(){return String(cfg.SUPABASE_URL||'').replace(/\/$/,'')+'/functions/v1/resolve-map-link'}
+function v771ConfigReady(){return !!(cfg?.MAP_FUNCTION_URL||cfg?.SUPABASE_URL)}
+function v771FunctionUrl(){return cfg?.MAP_FUNCTION_URL||String(cfg.SUPABASE_URL||'').replace(/\/$/,'')+'/functions/v1/resolve-map-link'}
 async function v771ResolveViaFetch(url){
- if(!v771ConfigReady()) throw new Error('Thiếu SUPABASE_URL / SUPABASE_ANON_KEY trong config.js');
- const key=cfg.SUPABASE_ANON_KEY;
- const res=await fetch(v771FunctionUrl(),{method:'POST',headers:{'Content-Type':'application/json','apikey':key,'Authorization':'Bearer '+key},body:JSON.stringify({url})});
+ if(!v771ConfigReady()) throw new Error('Thiếu MAP_FUNCTION_URL / SUPABASE_URL trong config.js');
+ const key=cfg.SUPABASE_ANON_KEY||'';
+ const headers={'Content-Type':'application/json'};if(key){headers.apikey=key;headers.Authorization='Bearer '+key}
+ const res=await fetch(v771FunctionUrl(),{method:'POST',headers,body:JSON.stringify({url})});
  let data=null;try{data=await res.json()}catch(_e){}
  if(!res.ok||!data?.ok) throw new Error(data?.error||`Edge Function HTTP ${res.status}`);
  const lat=Number(data.lat),lng=Number(data.lng);
@@ -1161,7 +1152,7 @@ v763ResolveOne=async function(x){
  if(!String(x.mapsUrl||'').trim())throw new Error('Cơ sở chưa có link Google Maps');
  let firstErr=null;
  if(supabaseClient){try{
-   const {data,error}=await invokeMapResolver(x.mapsUrl);
+   const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:x.mapsUrl}});
    if(error)throw error;
    if(data?.ok&&Number.isFinite(Number(data.lat))&&Number.isFinite(Number(data.lng)))return {lat:Number(data.lat),lng:Number(data.lng),finalUrl:data.finalUrl||x.mapsUrl,source:'resolve-map-link'};
    throw new Error(data?.error||'Không tìm thấy tọa độ');
@@ -1231,3 +1222,15 @@ const _v772Accounts=v755OpenAccounts;v755OpenAccounts=async function(){
  const note=c.querySelector('.v755-note');
  if(note)note.insertAdjacentHTML('afterend',`<div class="v755-account" style="margin:10px 0"><div><b>👑 ADMIN</b><small>${email?`Email Supabase: ${esc(email)}`:'Chưa đăng nhập bằng email Supabase'}</small><span><i>Toàn bộ TDP</i><i>Toàn quyền</i></span></div><button onclick="v772OpenAdminProfile()">Sửa tên / mật khẩu</button></div>`);
 };
+
+
+/* ===== V7.8.0 MOBILE UX + NAVIGATION FIX ===== */
+(function(){
+ const dash=v753ShowDashboard,mapFn=v753ShowMap,listFn=v753ShowList;
+ v753ShowDashboard=function(){v780MobileNav('dashboard');return dash()};
+ v753ShowMap=function(){v753HideDashboard();v780MobileNav('map');const r=mapFn();document.body.dataset.mobiletab='map';setTimeout(()=>{if(map)map.invalidateSize(true)},80);return r};
+ v753ShowList=function(){v753HideDashboard();v780MobileNav('list');const r=listFn();document.body.dataset.mobiletab='list';return r};
+ const oldEnter=enterApp;enterApp=function(){const r=oldEnter();setTimeout(()=>{if(document.body.classList.contains('dashboard-mode'))v780MobileNav('dashboard')},180);return r};
+ window.addEventListener('orientationchange',()=>setTimeout(()=>{if(map)map.invalidateSize(true)},220));
+ window.addEventListener('resize',()=>{if(innerWidth<=760)setTimeout(()=>{if(map)map.invalidateSize(false)},80)},{passive:true});
+})();

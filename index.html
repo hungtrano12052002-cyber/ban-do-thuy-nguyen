@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<link rel="stylesheet" href="style.css?v=7.7.5">
+<link rel="stylesheet" href="style.css?v=7.7.6">
 </head>
 <body>
 <div id="login" class="screen vietnam-login">
@@ -36,7 +36,7 @@
     <div class="cc-motto">Vì bình yên Thủy Nguyên</div>
   </aside>
   <header>
-    <div class="brand police-brand"><img src="icons/cong-an-hai-phong.png" alt=""><div><small>CÔNG AN TP HẢI PHÒNG</small><b>Bản đồ số · CAP Thủy Nguyên</b></div><span class="version">V7.7.5</span></div>
+    <div class="brand police-brand"><img src="icons/cong-an-hai-phong.png" alt=""><div><small>CÔNG AN TP HẢI PHÒNG</small><b>Bản đồ số · CAP Thủy Nguyên</b></div><span class="version">V7.8.0</span></div>
     <div class="head-actions"><span id="cloudStatus" class="role-pill">LOCAL</span><button class="install-btn" onclick="installPwa()">⬇ Cài app</button><span id="role" class="role-pill"></span><button onclick="logout()">Đăng xuất</button></div>
   </header>
   <div class="toolbar">
@@ -56,11 +56,12 @@
     <div class="v66-chips"><button class="active" data-v66="all" onclick="v66Chip(this,'all')">Tất cả</button><button data-v66="active" onclick="v66Chip(this,'active')">Đang hoạt động</button><button data-v66="geo" onclick="v66Chip(this,'geo')">Có vị trí</button><button data-v66="near" onclick="v66NearMe(this)">Gần tôi</button></div><div class="map-compass">N</div><button class="map-type-fab" id="layerFab" onclick="openMapLayers()">▱ <span>Kiểu bản đồ</span></button><div id="mapNotice" class="map-notice" onclick="showUnlocated()"></div>
     <div id="detail" class="detail hidden"></div><div class="map-accuracy" id="mapAccuracy">📍 0 điểm có tọa độ</div>
   </main>
-  <nav class="mobile-nav">
-    <button onclick="showMobileTab('map')">🗺️<span>Bản đồ</span></button>
-    <button onclick="showMobileTab('list')">📋<span>Danh sách</span></button>
-    <button onclick="locateMe()">◎<span>Vị trí</span></button>
-    <button class="admin-only" onclick="openAddSafely(event)">＋<span>Thêm</span></button><button onclick="openInstallHelp()">•••<span>Thêm</span></button>
+  <nav class="mobile-nav" aria-label="Điều hướng chính">
+    <button data-mnav="dashboard" onclick="v753ShowDashboard()">⌂<span>Tổng quan</span></button>
+    <button data-mnav="map" onclick="v753ShowMap()">🗺️<span>Bản đồ</span></button>
+    <button data-mnav="list" onclick="v753ShowList()">🏠<span>Cơ sở</span></button>
+    <button data-mnav="residents" onclick="v753OpenResidents()">👥<span>Cư trú</span></button>
+    <button class="admin-only" data-mnav="add" onclick="openAddSafely(event)">＋<span>Thêm</span></button>
   </nav>
 </div>
 <div id="modal" class="modal hidden" onclick="modalBackdrop(event)"><div id="modalCard" class="modal-card"></div></div>
@@ -69,8 +70,8 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="config.js?v=7.7.5"></script>
-<script src="data.js?v=7.7.5"></script><script src="app.js?v=7.7.5"></script>
+<script src="config.js?v=7.8.0"></script>
+<script src="data.js?v=7.8.0"></script><script src="app.js?v=7.8.0"></script>
 <script>
 // V7.7.5: keep broken local images from showing the browser broken-image glyph.
 document.addEventListener('error',function(e){var el=e.target;if(el&&el.tagName==='IMG'){el.style.visibility='hidden';el.setAttribute('aria-hidden','true');}},true);

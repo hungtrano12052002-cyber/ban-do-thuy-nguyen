@@ -1,8 +1,7 @@
-// BẢN ĐỒ SỐ THỦY NGUYÊN — CẤU HÌNH CLOUD
-// Điền 2 giá trị bên dưới từ Supabase Dashboard > Project Settings > API.
-// Chỉ dùng anon/publishable key ở đây. KHÔNG đặt service_role/secret key trong ứng dụng.
+// Bản cấu hình V7.7.6 FIX
+// Edge Function đã được chuyển sang project Supabase đang hoạt động.
 window.APP_CONFIG = {
-  SUPABASE_URL: 'https://sffvvafgpetjvqdyudgu.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_FhA0AYaGQEpKVXCKDFLsDA_KLQ6DG_y',
-  STORAGE_BUCKET: 'place-images'
+  SUPABASE_URL: 'https://cpnxrxnrzfnkmokmbiht.supabase.co',
+  SUPABASE_ANON_KEY: '', // Giữ trống nếu chỉ dùng GPS. Điền anon/publishable key để dùng đăng nhập + Cloud DB.
+  MAP_FUNCTION_URL: 'https://cpnxrxnrzfnkmokmbiht.supabase.co/functions/v1/resolve-map-link'
 };
