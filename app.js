@@ -5,6 +5,22 @@ const SEARCH_FIELDS=['name','category','wardBlock','officer','ownerName','ownerP
 const demoAuth={admin:{pass:'admin123',role:'admin'},user:{pass:'user123',role:'user'}};
 const cfg=window.APP_CONFIG||{};
 const cloudEnabled=!!(cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY&&window.supabase?.createClient);
+const MAP_FUNCTION_URL='https://cpnxrxnrzfnkmokmbiht.supabase.co/functions/v1/resolve-map-link';
+async function invokeMapResolver(url){
+ try{
+  const response=await fetch(MAP_FUNCTION_URL,{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({url})
+  });
+  let data=null;
+  try{data=await response.json()}catch(e){}
+  if(!response.ok)return {data:null,error:new Error(data?.error||`HTTP ${response.status}`)};
+  return {data,error:null};
+ }catch(error){
+  return {data:null,error};
+ }
+}
 
 
 /* ===== V6.8.4 CATEGORY HOTFIX =====
@@ -303,7 +319,7 @@ function v67SetProgress(done,total,msg){const p=total?Math.round(done/total*100)
 function v67Log(msg,ok=true){const e=$('v67Log');if(!e)return;e.insertAdjacentHTML('afterbegin',`<div class="${ok?'ok':'bad'}">${ok?'✓':'!'} ${esc(msg)}</div>`)}
 async function v67SaveResolved(x,lat,lng,finalUrl){x.lat=Number(lat);x.lng=Number(lng);if(finalUrl&&/google\./i.test(finalUrl))x.resolvedMapsUrl=finalUrl;x.coordinateSource='google-map-link';x.coordinateUpdatedAt=new Date().toISOString();if(currentUser?.cloud){const {error}=await supabaseClient.from('places').upsert({id:String(x.id),data:x,updated_at:new Date().toISOString(),updated_by:currentUser.id});if(error)throw error}else persist()}
 function v67ResolveDirectUrls(){let n=0;places.forEach(x=>{if(validGeo(x)||!x.mapsUrl)return;const c=parseCoords(x.mapsUrl);if(c){x.lat=c[0];x.lng=c[1];x.coordinateSource='url';n++}});persist();renderAll();toast(n?`Đã lấy tọa độ cho ${n} cơ sở từ URL đầy đủ.`:'Không có URL đầy đủ mới chứa tọa độ.');v67OpenResolver()}
-async function v67CallResolver(x){if(!supabaseClient)throw new Error('Chưa kết nối Supabase');const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:x.mapsUrl}});if(error)throw error;if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ');return data}
+async function v67CallResolver(x){if(!supabaseClient)throw new Error('Chưa kết nối Supabase');const {data,error}=await invokeMapResolver(x.mapsUrl);if(error)throw error;if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ');return data}
 async function v67ResolveAll(){
  if(v67Resolving)return;if(!currentUser?.cloud||currentUser.role!=='admin')return toast('Cần đăng nhập Cloud Admin.');
  const todo=places.filter(x=>!validGeo(x)&&x.mapsUrl);if(!todo.length)return toast('Tất cả cơ sở có link đã có tọa độ.');
@@ -325,7 +341,7 @@ function v67Unlocated(){return places.filter(x=>!validGeo(x)&&String(x.mapsUrl||
 function v67ResolverReady(){return !!(currentUser?.cloud&&supabaseClient&&cfg.SUPABASE_URL&&cfg.SUPABASE_ANON_KEY)}
 async function v67CallResolver(place){
  if(!v67ResolverReady())throw new Error('Cần đăng nhập Cloud Admin và cấu hình Supabase.');
- const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:place.mapsUrl}});
+ const {data,error}=await invokeMapResolver(place.mapsUrl);
  if(error)throw error;
  if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ trong liên kết.');
  return {lat:Number(data.lat),lng:Number(data.lng),finalUrl:data.finalUrl||place.mapsUrl};
@@ -973,7 +989,7 @@ async function v763ResolveOne(x){
  const direct=parseCoords(String(x.mapsUrl||''));
  if(direct&&Number.isFinite(direct[0])&&Number.isFinite(direct[1])) return {lat:direct[0],lng:direct[1],finalUrl:x.mapsUrl,source:'url'};
  if(!v763ResolverAvailable()) throw new Error('Chưa kết nối bộ phân giải Google Maps');
- const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:x.mapsUrl}});
+ const {data,error}=await invokeMapResolver(x.mapsUrl);
  if(error)throw error;
  if(!data?.ok||!Number.isFinite(Number(data.lat))||!Number.isFinite(Number(data.lng)))throw new Error(data?.error||'Không tìm thấy tọa độ');
  return {lat:Number(data.lat),lng:Number(data.lng),finalUrl:data.finalUrl||x.mapsUrl,source:'resolve-map-link'};
@@ -1145,7 +1161,7 @@ v763ResolveOne=async function(x){
  if(!String(x.mapsUrl||'').trim())throw new Error('Cơ sở chưa có link Google Maps');
  let firstErr=null;
  if(supabaseClient){try{
-   const {data,error}=await supabaseClient.functions.invoke('resolve-map-link',{body:{url:x.mapsUrl}});
+   const {data,error}=await invokeMapResolver(x.mapsUrl);
    if(error)throw error;
    if(data?.ok&&Number.isFinite(Number(data.lat))&&Number.isFinite(Number(data.lng)))return {lat:Number(data.lat),lng:Number(data.lng),finalUrl:data.finalUrl||x.mapsUrl,source:'resolve-map-link'};
    throw new Error(data?.error||'Không tìm thấy tọa độ');
