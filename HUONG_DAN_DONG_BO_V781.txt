@@ -1,0 +1,23 @@
+BẢN 7.8.1 – SỬA DANH SÁCH NGƯỜI CƯ TRÚ
+
+CẤU HÌNH BẮT BUỘC
+config.js hiện có SUPABASE_ANON_KEY trống. Khi trống, không có đồng bộ giữa máy tính và điện thoại.
+1. Tại dự án Supabase đang dùng, lấy khóa anon hoặc publishable công khai, điền vào SUPABASE_ANON_KEY trong config.js. Không dùng service_role/secret key.
+2. Triển khai toàn bộ thư mục này lên nơi đang lưu web. Web và app cần dùng cùng dự án Supabase và cùng địa chỉ web (app là PWA).
+3. Đăng nhập bằng tài khoản email Supabase trên cả hai thiết bị. admin/admin123 và tài khoản tạo cục bộ chỉ dùng LOCAL, không đồng bộ. Tài khoản cần được cấp quyền TDP tương ứng.
+4. Trước khi chuyển: xuất JSON trên TỪNG thiết bị để sao lưu dữ liệu cư trú hiện có. Dữ liệu LOCAL không tự chuyển lên máy chủ. Không bấm đưa dữ liệu gốc lên cloud nếu máy chủ đã có dữ liệu thật; cần đối chiếu và chuyển dữ liệu riêng để tránh ghi đè.
+5. Mở lại web và app khi có mạng để nhận bản mới. Xác nhận nhãn ĐÃ ĐỒNG BỘ. Nếu app vẫn hiển thị giao diện cũ, đóng hẳn rồi mở lại. Không xóa dữ liệu trang web trước khi sao lưu.
+6. Nếu Realtime chưa bật cho places, chạy SUPABASE_V781_REALTIME.sql. Bản này vẫn tải lại mỗi 15 giây và khi mở lại app nếu Realtime mất kết nối.
+
+KIỂM TRA SAU TRIỂN KHAI
+Thêm một người thử tại cơ sở được phép sửa trên web, lưu; mở danh sách trên điện thoại. Kiểm tra sửa và xóa ở chiều ngược lại. Kiểm tra cả trạng thái cư trú và bộ lọc TDP. Xóa dữ liệu thử khi hoàn tất.
+
+ĐÃ SỬA
+- Tải phân trang, không bị cắt ở giới hạn trả về mặc định của máy chủ.
+- Không thay dữ liệu cloud bằng dữ liệu cục bộ/gốc khi lỗi tải hoặc cloud rỗng.
+- Cập nhật danh sách đang mở, giữ bộ lọc; tải lại khi trở về app/có mạng và mỗi 15 giây.
+- Hiển thị các dòng cư trú nhập trực tiếp trong danh sách tổng hợp; giữ nguyên nội dung gốc. Nếu cùng họ tên đã có trong bảng cấu trúc, ưu tiên bảng cấu trúc. Google Sheet chỉ là liên kết, không tự nhập nội dung Sheet.
+- Phân biệt LOCAL, đã đồng bộ và lỗi kết nối; sửa nút xuất CSV danh sách tổng hợp.
+
+GIỚI HẠN
+Đã kiểm tra mã và mô phỏng tải dữ liệu; chưa kiểm thử trực tiếp trên máy chủ/điện thoại vì chưa có khóa kết nối và link web. Hai người sửa cùng một cơ sở vẫn cần phối hợp để tránh ghi đè thay đổi đồng thời.

@@ -47,17 +47,33 @@ function loadLocalPlaces(){
   if(!places.length)places=JSON.parse(JSON.stringify(window.INITIAL_PLACES||[]));
   normalizePlaces();
 }
+// V7.8.1: serialize refreshes and never substitute device data for cloud data.
+let v781LoadPromise=null,v781SyncState='idle',v781LastSync=null;
 async function loadCloudPlaces(){
-  const {data,error}=await supabaseClient.from('places').select('id,data').order('updated_at',{ascending:false});
-  if(error){toast('Không tải được dữ liệu cloud: '+error.message);loadLocalPlaces();return;}
-  places=(data||[]).map(r=>({...r.data,id:r.id}));
-  if(!places.length)places=JSON.parse(JSON.stringify(window.INITIAL_PLACES||[]));
-  normalizePlaces();
+ if(!currentUser?.cloud||!supabaseClient)return false;
+ if(v781LoadPromise)return v781LoadPromise;
+ const uid=currentUser.id;
+ v781LoadPromise=(async()=>{
+  try{
+   const rows=[],size=500;
+   for(let offset=0;;offset+=size){
+    const {data,error}=await supabaseClient.from('places').select('id,data').order('id',{ascending:true}).range(offset,offset+size-1);
+    if(error)throw error;
+    rows.push(...(data||[]));if(!data||data.length<size)break;
+   }
+   if(!currentUser?.cloud||currentUser.id!==uid)return false;
+   places=rows.map(r=>({...r.data,id:r.id}));normalizePlaces();
+   v781SyncState='ok';v781LastSync=new Date();updateCloudBadge();return true;
+  }catch(error){v781SyncState='error';updateCloudBadge();toast('Chưa đồng bộ được. Giữ nguyên dữ liệu đang xem: '+(error.message||error));return false;}
+ })();
+ try{return await v781LoadPromise}finally{v781LoadPromise=null}
 }
 function subscribeRealtime(){
-  if(!supabaseClient)return;
-  if(realtimeChannel)supabaseClient.removeChannel(realtimeChannel);
-  realtimeChannel=supabaseClient.channel('places-live').on('postgres_changes',{event:'*',schema:'public',table:'places'},async()=>{await loadCloudPlaces();renderAll();toast('Dữ liệu vừa được đồng bộ từ máy khác.');}).subscribe();
+ if(!supabaseClient||!currentUser?.cloud)return;
+ if(realtimeChannel)supabaseClient.removeChannel(realtimeChannel);
+ realtimeChannel=supabaseClient.channel('places-live').on('postgres_changes',{event:'*',schema:'public',table:'places'},()=>v781Refresh()).subscribe(status=>{
+  if(status==='SUBSCRIBED')v781Refresh();
+ });
 }
 function normalizePlaces(){places=places.map((x,i)=>{let lat=numOrNull(x.lat),lng=numOrNull(x.lng);if((lat===null||lng===null)&&x.mapsUrl){const m=String(x.mapsUrl).match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)||String(x.mapsUrl).match(/[?&](?:query|destination)=(-?\d+(?:\.\d+)?)(?:%2C|,)(-?\d+(?:\.\d+)?)/i);if(m){lat=Number(m[1]);lng=Number(m[2])}}return {...x,id:String(x.id??Date.now()+i),images:Array.isArray(x.images)?x.images:[],category:x.category||inferCategory(x.name),lat,lng}})
 /* inferCategory is defined globally near the top (V6.8.4). */}
@@ -173,7 +189,7 @@ async function savePlace(e,id){
    const obj={...(old||{}),id:String(id),name:$('f_name').value.trim(),category:$('f_category').value.trim()||inferCategory($('f_name').value),wardBlock:$('f_wardBlock').value.trim(),ownerName:$('f_ownerName').value.trim(),ownerPhone:$('f_ownerPhone').value.trim(),managerName:$('f_managerName').value.trim(),managerPhone:$('f_managerPhone').value.trim(),managerAddress:$('f_managerAddress').value.trim(),officer:$('f_officer').value.trim(),scale:$('f_scale').value.trim(),status:$('f_status').value.trim(),legal:$('f_legal').value.trim(),mapsUrl:$('f_mapsUrl').value.trim(),lodgerListUrl:$('f_lodgerListUrl').value.trim(),residentsText:$('f_residentsText')?.value.trim()||'',residents:v72CollectResidents(),lat:numOrNull($('f_lat').value),lng:numOrNull($('f_lng').value),images};
    if(currentUser.cloud){
      const {error}=await supabaseClient.from('places').upsert({id:String(id),data:obj,updated_at:new Date().toISOString(),updated_by:currentUser.id});if(error)throw error;
-     await loadCloudPlaces();toast('Đã lưu và đồng bộ lên cloud.');
+     const refreshed=await loadCloudPlaces();if(!refreshed){const index=places.findIndex(p=>String(p.id)===String(id));if(index>=0)places[index]=obj;else places.unshift(obj);}toast(refreshed?'Đã lưu và đồng bộ lên cloud.':'Đã lưu lên máy chủ; chưa tải lại được danh sách.');
    }else{if(old)Object.assign(old,obj);else places.unshift(obj);persist();toast('Đã lưu dữ liệu trên thiết bị này.')}
    closeModal();renderAll();focusPlace(id);
  }catch(err){toast('Lưu thất bại: '+(err.message||err))}finally{if(btn){btn.disabled=false;btn.textContent='Lưu'}}
@@ -206,7 +222,7 @@ async function seedCloud(){
  const chunk=100;for(let i=0;i<rows.length;i+=chunk){const {error}=await supabaseClient.from('places').upsert(rows.slice(i,i+chunk));if(error)return toast('Đồng bộ thất bại: '+error.message)}
  toast(`Đã đồng bộ ${rows.length} cơ sở lên cloud.`);closeModal();await loadCloudPlaces();renderAll();
 }
-async function refreshCloud(){closeModal();await loadCloudPlaces();renderAll();toast('Đã tải dữ liệu mới nhất từ cloud.')}
+async function refreshCloud(){if(!currentUser?.cloud)return toast('Chế độ LOCAL không đồng bộ giữa các thiết bị. Hãy đăng nhập bằng email cloud.');closeModal();if(await loadCloudPlaces()){renderAll();toast('Đã tải dữ liệu mới nhất từ cloud.')}}
 function exportJson(){const blob=new Blob([JSON.stringify(places,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`thuy-nguyen-data-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);toast('Đã xuất dữ liệu JSON.')}
 async function importJson(e){const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data))throw 0;places=data;normalizePlaces();persist();renderAll();toast(`Đã nhập ${places.length} cơ sở.`)}catch{toast('File JSON không hợp lệ.')}e.target.value=''}
 async function resetData(){if(!confirm('Khôi phục dữ liệu gốc sẽ xóa các thay đổi cục bộ. Tiếp tục?'))return;localStorage.removeItem(STORE);places=JSON.parse(JSON.stringify(window.INITIAL_PLACES||[]));normalizePlaces();closeModal();dclose();renderAll();toast('Đã khôi phục dữ liệu gốc.')}
@@ -678,7 +694,7 @@ function v753ResidentStatusKey(r){const s=normSearch(r?.status||'');if(/tam vang
 function v780MobileNav(name){document.querySelectorAll('.mobile-nav button').forEach(b=>b.classList.toggle('active',b.dataset.mnav===name))}
 function v753OpenResidents(){
  v753HideDashboard();v780MobileNav('residents');
- const rows=filtered().flatMap(p=>(Array.isArray(p.residents)?p.residents:[]).map(r=>({...r,placeName:p.name,wardBlock:p.wardBlock,placeId:p.id,statusKey:v753ResidentStatusKey(r)})));
+ const rows=filtered().flatMap(p=>v781Residents(p).map(r=>({...r,placeName:p.name,wardBlock:p.wardBlock,placeId:p.id,statusKey:v753ResidentStatusKey(r)})));
  const tdps=[...new Set(rows.map(r=>String(r.wardBlock||'').trim()).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'vi'));
  const placesOpt=[...new Set(rows.map(r=>String(r.placeName||'').trim()).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'vi'));
  $('modalCard').innerHTML=`<div class="modal-head"><h2>👥 Danh sách người cư trú <small id="v780ResidentCount">(${rows.length})</small></h2><button onclick="closeModal()">×</button></div><div class="resident-page-tools v780-resident-tools"><div class="v780-search"><span>⌕</span><input id="v753rq" placeholder="Tìm họ tên, CCCD, SĐT, cơ sở..." oninput="v753FilterResidents()"></div><select id="v780rs" onchange="v753FilterResidents()"><option value="">Tất cả trạng thái</option><option value="active">Đang cư trú</option><option value="temp">Tạm vắng</option><option value="left">Đã rời đi</option></select><select id="v780tdp" onchange="v753FilterResidents()"><option value="">Tất cả TDP</option>${tdps.map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="v780place" onchange="v753FilterResidents()"><option value="">Tất cả cơ sở</option>${placesOpt.map(x=>`<option>${esc(x)}</option>`).join('')}</select><button onclick="v73ExportResidentsCsv()">⬇ Xuất CSV</button></div><div id="v753ResidentTable" class="resident-page-table"></div>`;
@@ -1234,3 +1250,45 @@ const _v772Accounts=v755OpenAccounts;v755OpenAccounts=async function(){
  window.addEventListener('orientationchange',()=>setTimeout(()=>{if(map)map.invalidateSize(true)},220));
  window.addEventListener('resize',()=>{if(innerWidth<=760)setTimeout(()=>{if(map)map.invalidateSize(false)},80)},{passive:true});
 })();
+
+/* V7.8.1: resident views share one source on desktop and installed PWA. */
+function v781Residents(p){
+ const rows=v72ResidentArray(p),seen=new Set(rows.map(r=>normSearch(r.name)));
+ for(const line of v7ResidentLines(p)){
+  const parts=line.split('|').map(s=>s.trim());
+  if(!seen.has(normSearch(parts[0]))){rows.push({name:parts[0],phone:parts[1]||'',cccd:parts[2]||'',status:'Đang cư trú'});seen.add(normSearch(parts[0]));}
+ }
+ return rows;
+}
+const v781RenderAll=renderAll;
+renderAll=function(){v781RenderAll();v781RefreshResidentView();
+ const d=$('detail');if(d&&!d.classList.contains('hidden')){const p=places.find(p=>String(p.id)===String(selectedId));if(p)showDetail(p);else dclose();}
+};
+async function v781Refresh(){
+ if(!currentUser?.cloud||document.visibilityState==='hidden')return;
+ if(await loadCloudPlaces())renderAll();
+}
+const v781OpenResidents=v753OpenResidents;
+v753OpenResidents=function(){v781OpenResidents();if(currentUser?.cloud)v781Refresh();};
+// Use original opener during repaint to avoid recursive network refresh.
+function v781RefreshResidentView(){
+ if(!$('v753ResidentTable')||$('modal')?.classList.contains('hidden'))return;
+ const ids=['v753rq','v780rs','v780tdp','v780place'],values=ids.map(id=>$(id)?.value||'');
+ v781OpenResidents();ids.forEach((id,i)=>{if($(id))$(id).value=values[i]});v753FilterResidents();
+};
+updateCloudBadge=function(){
+ const e=$('cloudStatus');if(!e)return;
+ e.textContent=!currentUser?.cloud?'◉ LOCAL · CHỈ MÁY NÀY':v781SyncState==='ok'?'☁ ĐÃ ĐỒNG BỘ':v781SyncState==='error'?'⚠ CHƯA ĐỒNG BỘ':'☁ ĐANG KẾT NỐI';
+ e.title=!currentUser?.cloud?'Danh sách chỉ lưu trên thiết bị. Cần cấu hình cloud và đăng nhập email trên cả hai thiết bị.':v781LastSync?'Lần tải thành công: '+v781LastSync.toLocaleString('vi-VN'):'Đang chờ tải dữ liệu chung';
+};
+window.addEventListener('online',v781Refresh);
+window.addEventListener('focus',v781Refresh);
+document.addEventListener('visibilitychange',v781Refresh);
+setInterval(v781Refresh,15000);
+function v73ExportResidentsCsv(){
+ const q=normSearch($('v753rq')?.value||''),st=$('v780rs')?.value||'',tdp=$('v780tdp')?.value||'',pl=$('v780place')?.value||'';
+ const rows=(window.__v753Residents||[]).filter(r=>(!q||normSearch(Object.values(r).join(' ')).includes(q))&&(!st||r.statusKey===st)&&(!tdp||r.wardBlock===tdp)&&(!pl||r.placeName===pl));
+ const keys=['name','birthYear','cccd','phone','placeName','wardBlock','status'];
+ const text=[['Họ tên','Năm sinh','CCCD','SĐT','Cơ sở','TDP','Trạng thái'],...rows.map(r=>keys.map(k=>r[k]||''))].map(r=>r.map(v73CsvCell).join(',')).join('\r\n');
+ const url=URL.createObjectURL(new Blob(['\ufeff'+text],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='Danh_sach_nguoi_cu_tru.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
