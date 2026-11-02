@@ -1,0 +1,25 @@
+KIỂM TRA BẢN 7.9.0
+
+ĐẠT
+- Cú pháp app.js, sync-config.js, sync-media.js và sw.js.
+- Hai máy mô phỏng dùng chung máy chủ: web thêm người, điện thoại nhận; điện thoại sửa, web nhận; giữ tham chiếu ảnh người và ảnh giấy tờ.
+- Tải 1.001 bản ghi theo nhiều trang; tải danh sách rỗng; lỗi mạng giữ dữ liệu đã tải.
+- Yêu cầu tải lại đến trong lúc đang tải không bị mất; bản sửa cũ bị chặn thay vì ghi đè.
+- Bộ lọc tìm kiếm và phạm vi TDP; từ chối secret key/service_role trong màn hình kết nối.
+- Đối chiếu dữ liệu LOCAL: giữ tên cơ sở trên cloud, bổ sung người còn thiếu, bỏ qua khác biệt cần đối chiếu.
+- Biểu mẫu DOM: có nút chọn ảnh/chụp ảnh cho từng người và giấy tờ, lưu/mở lại/loại ảnh, giữ thuộc tính mở rộng của người cư trú.
+- IndexedDB lưu byte ảnh; lỗi lưu cloud giữ nội dung đang nhập và hiển thị lỗi trong biểu mẫu.
+- Thực thi migration SQL hai lần trên PostgreSQL nhúng (PGlite).
+- SQL thực: revision và kiểm tra xung đột, gửi lại cùng bản ghi không tạo bản sửa mới, phân quyền TDP, từ chối tài khoản chỉ xem ghi dữ liệu, từ chối tải ảnh sang TDP khác.
+- SQL thực: ảnh riêng không đọc được dưới vai trò anon dù có policy cũ cho phép rộng; người có quyền TDP chỉ thấy ảnh trong phạm vi.
+- GPS chỉ cập nhật trường tọa độ, giữ nguyên người cư trú đã được sửa trên máy chủ.
+
+CHƯA KIỂM TRA TRỰC TIẾP
+- Dự án Supabase đang vận hành, tài khoản thật và bucket thật.
+- Link web đang dùng, bản app PWA đang cài trên iPhone, camera và hiển thị ảnh trên thiết bị thật.
+- Việc phân phối bản mới từ nơi đang hosting và nhận cập nhật qua service worker trên thiết bị thật.
+- Không có trình duyệt headless khả dụng trong môi trường kiểm tra; kiểm tra giao diện hiện tại ở mức DOM, chưa có kiểm tra ảnh chụp giao diện.
+
+ĐIỀU KIỆN XÁC NHẬN THỰC TẾ
+- Chạy file SQL nâng cấp, điền khóa công khai, triển khai cùng bản 7.9.0 và đăng nhập cloud trên hai thiết bị.
+- Thử thêm/sửa/xóa người cư trú ở hai chiều và mở ảnh trên máy còn lại theo hướng dẫn.

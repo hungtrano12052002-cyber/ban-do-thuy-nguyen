@@ -1,0 +1,74 @@
+BẢN ĐỒ SỐ THỦY NGUYÊN 7.9.0
+SỬA ĐỒNG BỘ NGƯỜI CƯ TRÚ VÀ BỔ SUNG HÌNH ẢNH
+
+1. NGUYÊN NHÂN TÌM THẤY TRONG BẢN GỬI
+- config.js có SUPABASE_ANON_KEY để trống. Vì thế không khởi tạo kết nối cơ sở dữ liệu dùng chung.
+- admin/admin123 và các tài khoản tạo cục bộ chỉ lưu trên từng máy. Cài app không tự chuyển dữ liệu LOCAL sang máy chủ.
+- Bản này là PWA: app điện thoại và web dùng cùng mã nguồn, nhưng từng nơi có vùng lưu trữ riêng.
+- Trước đây một số bước chuẩn hóa người cư trú bỏ các thuộc tính ngoài danh sách cố định; bộ lọc cuối cùng còn trỏ tới ID không có trong trang HTML.
+
+2. CẬP NHẬT BẢN MỚI
+A. Trước khi cập nhật
+- Xuất JSON sao lưu trên TỪNG thiết bị đang chứa dữ liệu. Giữ nguyên các file sao lưu.
+- Không xóa dữ liệu Safari/Chrome hoặc gỡ app trước khi đã sao lưu.
+B. Nâng cấp máy chủ
+- Mở đúng dự án Supabase đang dùng.
+- Nếu dự án đã có bảng places và profiles: chỉ chạy SUPABASE_V790_DONG_BO_VA_ANH.sql trong SQL Editor.
+- Chỉ với dự án hoàn toàn mới: chạy supabase_setup.sql trước, rồi chạy SUPABASE_V790_DONG_BO_VA_ANH.sql.
+- Script thêm revision, hàm lưu có kiểm tra phiên bản, quyền TDP và kho ảnh riêng tn-private-media; không xóa cơ sở/người cư trú/ảnh cơ sở cũ.
+- Kiểm tra tài khoản email trong Authentication > Users có hồ sơ tương ứng trong bảng profiles. Tài khoản chủ cần role=admin; tài khoản cán bộ cần tdp_access và can_edit theo phân công. Không dùng tài khoản admin cục bộ để đăng nhập dữ liệu chung.
+C. Cập nhật web
+- Thay nội dung thư mục web hiện tại bằng TOÀN BỘ nội dung thư mục Ban_do_so_Thuy_Nguyen_V7_9_0. index.html phải nằm ở thư mục gốc của web.
+- Giữ cấu hình Supabase đang hoạt động nếu có. Bản cấu hình này đã có URL dự án và khóa publishable công khai bạn cung cấp.
+- Lấy Publishable key (sb_publishable_...) hoặc anon public key từ phần API Keys của dự án. Không đưa secret key/service_role vào trình duyệt.
+- Điền SUPABASE_ANON_KEY trong config.js trước khi đưa lên web để cả hai thiết bị tự nhận cấu hình; hoặc nhập trực tiếp tại nút “Kết nối web và điện thoại” trên TỪNG thiết bị, cùng URL và khóa.
+- Nếu trước đây đã lưu kết nối tại nút này, cấu hình riêng trên máy được ưu tiên hơn config.js. Mở mục Đồng bộ để kiểm tra địa chỉ dự án trên từng máy khi đổi dự án.
+- Mở lại web, đóng hẳn rồi mở app. Xác nhận phiên bản V7.9.0 ở đầu trang. Cả hai nên mở/cài từ cùng địa chỉ web HTTPS.
+D. Đăng nhập
+- Đăng xuất admin cục bộ; đăng nhập bằng email Supabase trên cả hai thiết bị.
+- Bấm Đồng bộ > Kiểm tra kết nối. Đối chiếu tên dự án giống nhau, trạng thái ĐÃ ĐỒNG BỘ và quyền TDP.
+- Web/app dùng hai tài khoản khác nhau vẫn đồng bộ nếu cùng dự án và cùng có quyền xem TDP liên quan.
+
+3. ĐƯA DỮ LIỆU CŨ ĐÃ NHẬP RIÊNG LÊN MÁY CHỦ
+- Trên từng thiết bị, vào Đồng bộ > Sao lưu dữ liệu trên máy này. Bản sao lưu mới bao gồm cả ảnh cục bộ mới được lưu trong IndexedDB.
+- Sau khi đăng nhập email và kết nối thành công: Đồng bộ > Chuyển bản sao lưu lên dữ liệu chung > chọn file JSON.
+- Đọc bảng đối chiếu, đánh dấu các cơ sở cần chuyển rồi bấm Chuyển các cơ sở đã chọn.
+- Với cơ sở đã có: giữ thông tin cơ sở trên máy chủ; chỉ bổ sung người còn thiếu, thông tin còn trống và ảnh. Trường hợp khác nhau/khó xác định được bỏ qua và báo số lượng để đối chiếu thủ công từ file gốc.
+- Cơ sở chưa có chỉ tài khoản ADMIN máy chủ mới thêm được. Cơ sở được đối chiếu theo ID; hai cơ sở trùng tên nhưng khác ID cần kiểm tra thủ công trước khi chọn.
+- Không bấm nhập dữ liệu gốc để thay thế toàn bộ máy chủ. Chức năng cũ đã được chuyển sang bước đối chiếu này.
+- Việc chuyển có thể thành công một phần: nhật ký nêu cơ sở nào chưa chuyển; giữ file JSON để xử lý tiếp. Không xóa dữ liệu gốc cho đến khi kiểm tra xong cả hai thiết bị.
+- Liên kết Google Sheet vẫn là liên kết, không tự đọc nội dung bảng tính.
+
+4. THÊM ẢNH NGƯỜI CƯ TRÚ
+- Mở cơ sở > Sửa > Quản lý người cư trú.
+- Trong từng dòng người cư trú, chọn “Chọn ảnh” hoặc “Chụp ảnh”. Tối đa 6 ảnh/người.
+- Đợi ảnh xem trước xuất hiện rồi bấm Lưu ở cuối biểu mẫu.
+- Ảnh xuất hiện khi mở lại cơ sở; danh sách cư trú trên điện thoại có ảnh đại diện đầu tiên.
+
+5. THÊM ẢNH GIẤY TỜ CƠ SỞ
+- Mở cơ sở > Sửa > Ảnh giấy tờ của cơ sở.
+- Chọn loại: Đăng ký kinh doanh; Giấy chứng nhận quyền sử dụng đất / sổ đỏ; Hồ sơ PCCC; Giấy tờ khác.
+- Chọn nhiều ảnh hoặc chụp bằng camera, sau đó bấm Lưu. Tối đa 30 ảnh/cơ sở.
+- Bấm ảnh trong chi tiết cơ sở để phóng to.
+- Ảnh người cư trú/giấy tờ lưu ở bucket riêng tn-private-media, không dùng bucket công khai place-images của ảnh cơ sở. Quyền xem theo TDP, quyền thêm theo quyền chỉnh sửa. Liên kết xem ảnh có thời hạn 10 phút.
+- Ảnh được chuyển sang JPEG; tài liệu tối đa cạnh dài 2400 px, chân dung 1200 px. Nên giữ ảnh gốc nếu cần bản đầy đủ độ phân giải.
+- “Bỏ ảnh” bỏ liên kết khỏi hồ sơ sau khi Lưu, không xóa ngay file gốc khỏi kho. Cách này tránh mất ảnh khi thiết bị khác vẫn đang chỉnh sửa; quản trị viên có thể dọn file không còn tham chiếu sau khi kiểm tra.
+
+6. KIỂM TRA HAI CHIỀU SAU TRIỂN KHAI
+- Web: thêm người thử, lưu; điện thoại mở danh sách cùng TDP và kiểm tra trong tối đa khoảng 15 giây khi có mạng.
+- Điện thoại: sửa số điện thoại/ngày đến, thêm ảnh; web kiểm tra thông tin mới và mở ảnh.
+- Thử thêm ảnh giấy tờ, đóng rồi mở lại cơ sở ở cả hai máy.
+- Xóa dữ liệu thử khi kiểm tra xong.
+- Hai thiết bị cùng mở sửa một cơ sở: thiết bị lưu sau sẽ được báo xung đột, giữ nguyên biểu mẫu. Bấm Xuất bản nháp, mở lại cơ sở và đối chiếu thay vì ghi đè người khác.
+
+7. MẤT MẠNG VÀ BẢN NHÁP
+- Khi dùng dữ liệu chung, mất mạng thì không báo lưu thành công và không âm thầm lưu thành bản riêng. Nội dung biểu mẫu đang mở được giữ để thử lại.
+- Có thể bấm Xuất bản nháp; file bao gồm dữ liệu và ảnh cục bộ đã chọn. Bản nháp có thể dùng ở bước chuyển bản sao lưu để bổ sung; phần khác nhau cần đối chiếu thủ công.
+- Không đóng app trước khi lưu/xuất bản nháp. Bản này chưa có hàng đợi tự động gửi dữ liệu khi mất mạng.
+- Khi dùng LOCAL, thông tin và ảnh chỉ ở thiết bị đó; ảnh mới lưu trong IndexedDB để tránh tràn localStorage.
+
+8. PHẠM VI ĐÃ KIỂM TRA
+- Kiểm tra cú pháp JavaScript; mô phỏng hai thiết bị đọc/ghi cùng máy chủ, tải nhiều trang dữ liệu, lỗi mạng, xung đột bản sửa và cập nhật trong lúc đang tải.
+- Kiểm tra biểu mẫu DOM thực: thêm/lưu/mở lại ảnh người và giấy tờ, giữ trường mở rộng, bỏ ảnh và giữ nguyên nội dung khi lưu thất bại.
+- Kiểm tra SQL bằng PostgreSQL nhúng trong môi trường thử; xem KET_QUA_KIEM_TRA.txt.
+- Chưa xác minh trên dự án Supabase thật hoặc app iPhone của bạn vì file gửi chưa có khóa công khai, link web hoặc quyền triển khai. Cần hoàn thành mục 2 và mục 6 trước khi xác nhận hệ thống đang chạy thực tế đã đồng bộ.

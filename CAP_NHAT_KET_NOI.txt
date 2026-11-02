@@ -1,0 +1,20 @@
+CẬP NHẬT KẾT NỐI NGÀY 30/10/2026
+
+Web đang dùng: https://hungtrano12052002-cyber.github.io/ban-do-thuy-nguyen/
+Dự án: https://cpnxrxnrzfnkmokmbiht.supabase.co
+
+ĐÃ KIỂM TRA
+- Khóa publishable do bạn gửi được máy chủ chấp nhận: Auth settings HTTP 200.
+- config.js trên web hiện vẫn để SUPABASE_ANON_KEY trống.
+- Máy chủ báo column places.revision does not exist: chưa chạy migration V7.9.0.
+- config.js trong gói cập nhật này đã điền URL và khóa publishable.
+- Chưa đăng nhập hoặc đọc dữ liệu cư trú thật; chưa thay đổi dữ liệu máy chủ.
+
+CẦN LÀM TIẾP
+1. Trong Supabase > SQL Editor > New query, mở và sao chép toàn bộ nội dung file SUPABASE_V790_DONG_BO_VA_ANH.sql rồi bấm Run. Chạy trong dự án cpnxrxnrzfnkmokmbiht. Không chạy lại supabase_setup.sql trên dự án đã có dữ liệu.
+2. Đưa toàn bộ NỘI DUNG thư mục Ban_do_so_Thuy_Nguyen_V7_9_0 lên vị trí web hiện tại trong kho GitHub ban-do-thuy-nguyen. Không tải cả thư mục lồng bên ngoài; giữ index.html ở đúng vị trí cũ.
+3. Mở lại web/app, xác nhận V7.9.0. Đăng nhập email Supabase trên cả hai thiết bị. admin/admin123 cục bộ không đồng bộ.
+4. Bấm Đồng bộ > Kiểm tra kết nối. Nếu có cấu hình riêng đã lưu trên máy, xác nhận cùng URL và khóa mới.
+5. Trước khi chuyển dữ liệu cũ: sao lưu JSON trên từng thiết bị; dùng Chuyển bản sao lưu để đối chiếu rồi chuyển lên máy chủ. Không xóa dữ liệu trình duyệt khi chưa sao lưu.
+
+Khóa publishable chỉ cho phép kết nối theo phân quyền hiện có. Nó không cấp quyền sửa cấu trúc database hoặc cập nhật GitHub.
